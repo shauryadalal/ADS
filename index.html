@@ -3,12 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Jewellery Pricer v9.0</title>
+  <title>Jewellery Pricer v10.0</title>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{background:#09080a;overscroll-behavior:none}
+    input,select,textarea{font-size:16px!important}
     #err{display:none;color:#ff6060;padding:20px;font-family:monospace;white-space:pre-wrap;font-size:11px}
     ::-webkit-scrollbar{width:4px}
     ::-webkit-scrollbar-track{background:#0a080c}
@@ -549,6 +550,8 @@ function CustomerForm({ initial, onSave, onCancel }) {
 
 function CustomerBook({ customers, sales, onClose, onSave, onDelete, requireAuth }) {
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchDebounceRef = React.useRef(null);
   const [selected, setSelected] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [editCust, setEditCust] = useState(null);
@@ -614,7 +617,7 @@ function CustomerBook({ customers, sales, onClose, onSave, onDelete, requireAuth
       , React.createElement(ScreenHeader, { title: "👥 Customers" , subtitle: `${customers.length} clients`, onBack: onClose,
         action: React.createElement('button', { onClick: () => { setEditCust(null); setShowForm(true); }, style: { background: "#1a1030", border: "1px solid #5040a0", borderRadius: 8, color: "#b090f0", padding: "8px 14px", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },}, "+ New" ),} )
       , React.createElement('div', { style: { padding: "10px 16px", borderBottom: "1px solid #1a1428" },}
-        , React.createElement('input', { value: search, onChange: e => setSearch(e.target.value), placeholder: "Search by name or phone…"    ,
+        , React.createElement('input', { value: searchInput, onChange: e => { setSearchInput(e.target.value); clearTimeout(searchDebounceRef.current); searchDebounceRef.current = setTimeout(() => setSearch(e.target.value), 300); }, placeholder: "Search by name or phone…"    ,
           style: { width: "100%", background: "#0e0c14", border: "1px solid #2a1f35", borderRadius: 8, color: "#e8ddd0", fontSize: 13, padding: "9px 12px", outline: "none", fontFamily: "inherit", boxSizing: "border-box" },} )
       )
       , React.createElement('div', { style: { flex: 1, overflowY: "auto", padding: 12 },}
@@ -931,7 +934,7 @@ function PurchaseLedger({ purchases, onClose, onSave, onDelete, requireAuth }) {
 }
 
 // ── Reports ────────────────────────────────────────────────────
-function Reports({ sales, purchases, repairs, onClose }) {
+function Reports({ sales, purchases, repairs, onClose, onExportSales, onExportPurchases }) {
   const [period, setPeriod] = useState("month");
   const [offset, setOffset] = useState(0); // 0 = current, 1 = previous, etc.
 
@@ -975,7 +978,11 @@ function Reports({ sales, purchases, repairs, onClose }) {
 
   return (
     React.createElement('div', { style: { minHeight: "100vh", background: "#09080a", color: "#e8ddd0", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", display: "flex", flexDirection: "column" },}
-      , React.createElement(ScreenHeader, { title: "📊 Reports" , subtitle: "Business Intelligence" , onBack: onClose,} )
+      , React.createElement(ScreenHeader, { title: "📊 Reports" , subtitle: "Business Intelligence" , onBack: onClose,
+        action: React.createElement('div', { style: { display: "flex", gap: 6 },}
+          , React.createElement('button', { onClick: onExportSales, style: { background: "#0e1a0e", border: "1px solid #1e4a1e", borderRadius: 7, color: "#60c070", padding: "7px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },}, "↓ Sales CSV"  )
+          , React.createElement('button', { onClick: onExportPurchases, style: { background: "#0a0e1a", border: "1px solid #1a2a4a", borderRadius: 7, color: "#6090d0", padding: "7px 11px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" },}, "↓ Buys CSV"  )
+        ),} )
       /* Period selector */
       , React.createElement('div', { style: { background: "#0c0a10", borderBottom: "1px solid #1a1428", padding: "10px 16px" },}
         , React.createElement('div', { style: { display: "flex", gap: 6, marginBottom: 8 },}
@@ -1258,28 +1265,32 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
   return (
     React.createElement('div', { style: { minHeight: "100vh", background: "#09080a", color: "#e8ddd0", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", display: "flex", flexDirection: "column" },}
       /* Back bar */
-      , React.createElement('div', { style: { background: "#100d14", borderBottom: "1px solid #2a1f35", padding: "12px 16px", display: "flex", alignItems: "center", gap: 10, position: "sticky", top: 0, zIndex: 10 },}
-        , React.createElement('button', { onClick: onBack, style: { ...btnBase, background: "#1a1225", color: "#c4a0e0", border: "1px solid #3a2a4a" },}, "← Back" )
-        , React.createElement('div', { style: { flex: 1, minWidth: 0 },}
-          , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 2 },}
-            , React.createElement('span', { style: { fontSize: 9, color: "#6a4a8a", letterSpacing: 2 },}, "#", item.id)
-            , React.createElement('span', { style: { fontSize: 9, letterSpacing: 1, padding: "2px 7px", borderRadius: 10, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, fontWeight: 700 },}, badge.label)
+      , React.createElement('div', { style: { background: "#100d14", borderBottom: "1px solid #2a1f35", padding: "10px 16px", position: "sticky", top: 0, zIndex: 10 },}
+        /* Row 1: back + item name + id/badge */
+        , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 10, marginBottom: editMode ? 0 : 8 },}
+          , React.createElement('button', { onClick: onBack, style: { ...btnBase, background: "#1a1225", color: "#c4a0e0", border: "1px solid #3a2a4a", flexShrink: 0 },}, "← Back" )
+          , React.createElement('div', { style: { flex: 1, minWidth: 0 },}
+            , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 8, marginBottom: 2 },}
+              , React.createElement('span', { style: { fontSize: 9, color: "#6a4a8a", letterSpacing: 2 },}, "#", item.id)
+              , React.createElement('span', { style: { fontSize: 9, letterSpacing: 1, padding: "2px 7px", borderRadius: 10, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, fontWeight: 700 },}, badge.label)
+            )
+            , editMode
+              ? React.createElement(EField, { value: draft.name, onChange: v => setDraftField("name", v), style: { fontSize: 13, fontWeight: 700, color: "#e0d0f0" },} )
+              : React.createElement('div', { style: { fontSize: 14, color: "#e0d0f0", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },}, item.name)
+            
           )
-          , editMode
-            ? React.createElement(EField, { value: draft.name, onChange: v => setDraftField("name", v), style: { fontSize: 13, fontWeight: 700, color: "#e0d0f0" },} )
-            : React.createElement('div', { style: { fontSize: 14, color: "#e0d0f0", fontWeight: 700, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },}, item.name)
-          
         )
+        /* Row 2: action buttons — always on their own row so they never overlap the name */
         , editMode ? (
-          React.createElement('div', { style: { display: "flex", gap: 6 },}
-            , React.createElement('button', { onClick: saveEdit, style: { ...btnBase, background: "#143a14", color: "#70c070", border: "1px solid #305030" },}, "✓ Save" )
-            , React.createElement('button', { onClick: cancelEdit, style: { ...btnBase, background: "#2a1010", color: "#e07070", border: "1px solid #502020" },}, "✕")
+          React.createElement('div', { style: { display: "flex", gap: 6, paddingTop: 8 },}
+            , React.createElement('button', { onClick: saveEdit, style: { ...btnBase, background: "#143a14", color: "#70c070", border: "1px solid #305030", flex: 1, justifyContent: "center" },}, "✓ Save" )
+            , React.createElement('button', { onClick: cancelEdit, style: { ...btnBase, background: "#2a1010", color: "#e07070", border: "1px solid #502020" },}, "✕ Cancel" )
           )
         ) : (
           React.createElement('div', { style: { display: "flex", gap: 6 },}
-            , React.createElement('button', { onClick: () => requireAuth(startEdit), style: { ...btnBase, background: "#1a1a0a", color: "#c0b040", border: "1px solid #504820" },}, "✎ Edit" )
-            , React.createElement('button', { onClick: () => requireAuth(() => setConfirmDelete(true)), style: { ...btnBase, background: "#1a0a0a", color: "#a04040", border: "1px solid #401818", padding: "8px 12px" },}, "🗑")
-            , React.createElement('button', { onClick: () => requireAuth(() => onSell(item)), style: { ...btnBase, background: "#0a1a0a", color: "#50c050", border: "1px solid #184818", padding: "8px 12px" },}, "💰 Sell" )
+            , React.createElement('button', { onClick: () => requireAuth(startEdit), style: { ...btnBase, background: "#1a1a0a", color: "#c0b040", border: "1px solid #504820", flex: 1, justifyContent: "center" },}, "✎ Edit" )
+            , React.createElement('button', { onClick: () => requireAuth(() => setConfirmDelete(true)), style: { ...btnBase, background: "#1a0a0a", color: "#a04040", border: "1px solid #401818", padding: "8px 14px" },}, "🗑 Delete" )
+            , React.createElement('button', { onClick: () => requireAuth(() => onSell(item)), style: { ...btnBase, background: "#0a1a0a", color: "#50c050", border: "1px solid #184818", padding: "8px 14px" },}, "💰 Sell" )
           )
         )
       )
@@ -1719,6 +1730,8 @@ function AddItem({ onSave, onCancel, existingItems }) {
 
 function StockAnalyzer() {
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const searchDebounceRef = React.useRef(null);
   const [selected, setSelected] = useState(null);
   const [goldRate, setGoldRate] = useState(BASE_24K);
   const [filter, setFilter] = useState("all");
@@ -2229,6 +2242,72 @@ function StockAnalyzer() {
     return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
   });
 
+  // ── CSV Export ────────────────────────────────────────────────
+  function exportCSV(data, filename, columns) {
+    const header = columns.map(c => c.label).join(",");
+    const rows = data.map(row =>
+      columns.map(col => {
+        const val = col.fn ? col.fn(row) : (row[col.key] != null ? row[col.key] : "");
+        const str = String(val).replace(/"/g, '""');
+        return str.includes(",") || str.includes('"') || str.includes("\n") ? `"${str}"` : str;
+      }).join(",")
+    );
+    const csv = [header, ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportInventory() {
+    exportCSV(items, "inventory.csv", [
+      { label: "ID", key: "id" },
+      { label: "Kind", key: "kind" },
+      { label: "Name", key: "name" },
+      { label: "Gross Weight (g)", key: "gross_weight" },
+      { label: "Total Price", fn: r => Math.round(r.components ? r.components.reduce((a, comp) => {
+        if (comp.category === "gold" || comp.category === "kundan") return a + (comp.weight||0) * (comp.rate||0) * goldRate / 16480;
+        return a + (comp.price||0);
+      }, 0) : (r.total||0)) },
+      { label: "Tags", fn: r => (r.tags||[]).join("; ") },
+    ]);
+  }
+
+  function exportSalesCSV() {
+    exportCSV(sales, "sales.csv", [
+      { label: "Date", fn: r => r.dateSold || (r.createdAt||"").split("T")[0] },
+      { label: "Time", fn: r => (r.createdAt||"").split("T")[1] ? (r.createdAt||"").split("T")[1].slice(0,5) : "" },
+      { label: "Type", key: "type" },
+      { label: "Item", key: "itemName" },
+      { label: "Stock Price", key: "stockPrice" },
+      { label: "Final Price", key: "finalPrice" },
+      { label: "Margin", fn: r => Math.round((parseFloat(r.finalPrice)||0) - (parseFloat(r.stockPrice)||0)) },
+      { label: "Cash", key: "cash" },
+      { label: "Bank/UPI", key: "bank" },
+      { label: "Gold Weight (g)", key: "goldWeight" },
+      { label: "Gold Karat", key: "goldKarat" },
+      { label: "Gold Value", key: "goldValue" },
+      { label: "Old Jewellery Weight (g)", key: "oldJewelleryWeight" },
+      { label: "Old Jewellery Value", key: "oldJewelleryValue" },
+      { label: "Notes", key: "notes" },
+    ]);
+  }
+
+  function exportPurchasesCSV() {
+    exportCSV(purchases, "purchases.csv", [
+      { label: "Date", key: "date" },
+      { label: "Vendor", key: "vendorName" },
+      { label: "Item", key: "itemDescription" },
+      { label: "Category", key: "category" },
+      { label: "Weight", key: "weight" },
+      { label: "Rate", key: "rate" },
+      { label: "Total Cost", key: "totalCost" },
+      { label: "Payment", key: "paymentMode" },
+      { label: "Notes", key: "notes" },
+    ]);
+  }
+
   return (
     React.createElement('div', { style: { minHeight: "100vh", background: "#09080a" },}
       , showPwModal && React.createElement(PasswordModal, {
@@ -2253,7 +2332,7 @@ function StockAnalyzer() {
         onClose: () => setShowPurchases(false),
         onSave: savePurchase,
         onDelete: deletePurchase,} )
-      , showReports && React.createElement(Reports, { sales: sales, purchases: purchases, repairs: repairs, onClose: () => setShowReports(false),} )
+      , showReports && React.createElement(Reports, { sales: sales, purchases: purchases, repairs: repairs, onClose: () => setShowReports(false), onExportSales: exportSalesCSV, onExportPurchases: exportPurchasesCSV,} )
       , showAdd && !showSales && !showSellForm && React.createElement(AddItem, { onSave: handleAdd, onCancel: () => setShowAdd(false), existingItems: items,} )
       , selected && !showAdd && !showSales && !showSellForm && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
 
@@ -2262,18 +2341,8 @@ function StockAnalyzer() {
       , React.createElement('div', { style: { background: "linear-gradient(180deg,#100d14 0%,#09080a 100%)", borderBottom: "1px solid #2a1f35", padding: "16px 16px 12px" },}
         , React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "center" },}
           , React.createElement('div', null
-            , React.createElement('div', { style: { fontSize: 9, letterSpacing: 5, color: "#6a4a8a", textTransform: "uppercase", marginBottom: 3, fontWeight: 700 },}, "Stock Intelligence · "   , React.createElement('span', { style: { color: "#4a6a4a" },}, "v9.0"), " " , React.createElement('span', { style: { cursor: "pointer" }, onClick: () => unlocked && setUnlocked(false),}, unlocked ? "🔓" : "🔒"))
-            , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 10 },}
-              , React.createElement('h1', { style: { margin: 0, fontSize: 20, fontWeight: 800, color: "#e8ddd0" },}, "✦ Jewellery Pricer"  )
-              , React.createElement('button', { onClick: () => setShowAdd(true), style: { background: "#0e1a0e", border: "1px solid #305030", borderRadius: 6, color: "#60c070", padding: "3px 9px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "+ ADD" )
-              , React.createElement('button', { onClick: () => setShowSales(true), style: { background: "#0a1a14", border: "1px solid #104030", borderRadius: 6, color: "#40c090", padding: "3px 9px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "💰 SALES" )
-              , React.createElement('button', { onClick: () => setShowCustomers(true), style: { background: "#13101a", border: "1px solid #3a2a4a", borderRadius: 6, color: "#b090f0", padding: "3px 9px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "👥 CLIENTS" )
-              , React.createElement('button', { onClick: () => setShowRepairs(true), style: { background: "#1a1200", border: "1px solid #3a2a00", borderRadius: 6, color: "#e8b830", padding: "3px 9px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "🔧 REPAIRS" )
-              , React.createElement('button', { onClick: () => setShowPurchases(true), style: { background: "#0a0e1a", border: "1px solid #1a2a4a", borderRadius: 6, color: "#70a0e0", padding: "3px 9px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "📦 BUYS" )
-              , React.createElement('button', { onClick: () => setShowReports(true), style: { background: "#100d14", border: "1px solid #2a1f35", borderRadius: 6, color: "#9070c0", padding: "3px 9px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "📊 REPORTS" )
-              , React.createElement('button', { onClick: refreshBaseItems, title: "Push latest base item data to Firebase"      , style: { background: "#0a0e1a", border: "1px solid #18305a", borderRadius: 6, color: "#4060a0", padding: "3px 8px", fontSize: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "↻ SYNC" )
-              , React.createElement('button', { onClick: () => setResetConfirm(true), title: "Reset all edits"  , style: { background: "#1a0e0e", border: "1px solid #3a1818", borderRadius: 6, color: "#804040", padding: "3px 8px", fontSize: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1 },}, "↺ RESET" )
-            )
+            , React.createElement('div', { style: { fontSize: 9, letterSpacing: 5, color: "#6a4a8a", textTransform: "uppercase", marginBottom: 3, fontWeight: 700 },}, "Stock Intelligence · "   , React.createElement('span', { style: { color: "#4a6a4a" },}, "v10.0"), " " , React.createElement('span', { style: { cursor: "pointer" }, onClick: () => unlocked && setUnlocked(false),}, unlocked ? "🔓" : "🔒"))
+            , React.createElement('h1', { style: { margin: 0, fontSize: 20, fontWeight: 800, color: "#e8ddd0" },}, "✦ Jewellery Pricer"  )
           )
           , React.createElement('div', { style: { display: "flex", gap: 8 },}
             , React.createElement('div', { style: { background: kindBadge.ring.bg, border: `1px solid ${kindBadge.ring.border}`, borderRadius: 8, padding: "6px 10px", textAlign: "center" },}
@@ -2294,6 +2363,20 @@ function StockAnalyzer() {
             )
           )
         )
+      )
+
+      /* Nav button row — scrollable on mobile, full width with solid background */
+      , React.createElement('div', { style: { background: "#100d14", borderBottom: "1px solid #2a1f35", padding: "8px 16px", display: "flex", gap: 6, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" },}
+        , React.createElement('button', { onClick: () => setShowAdd(true), style: { background: "#0e1a0e", border: "1px solid #305030", borderRadius: 6, color: "#60c070", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "+ ADD" )
+        , React.createElement('button', { onClick: () => setShowSales(true), style: { background: "#0a1a14", border: "1px solid #104030", borderRadius: 6, color: "#40c090", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "💰 SALES" )
+        , React.createElement('button', { onClick: () => setShowCustomers(true), style: { background: "#13101a", border: "1px solid #3a2a4a", borderRadius: 6, color: "#b090f0", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "👥 CLIENTS" )
+        , React.createElement('button', { onClick: () => setShowRepairs(true), style: { background: "#1a1200", border: "1px solid #3a2a00", borderRadius: 6, color: "#e8b830", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "🔧 REPAIRS" )
+        , React.createElement('button', { onClick: () => setShowPurchases(true), style: { background: "#0a0e1a", border: "1px solid #1a2a4a", borderRadius: 6, color: "#70a0e0", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📦 BUYS" )
+        , React.createElement('button', { onClick: () => setShowReports(true), style: { background: "#100d14", border: "1px solid #2a1f35", borderRadius: 6, color: "#9070c0", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📊 REPORTS" )
+        , React.createElement('button', { onClick: exportInventory, style: { background: "#0e0a14", border: "1px solid #2a1a3a", borderRadius: 6, color: "#8060a0", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "↓ CSV" )
+        , React.createElement('div', { style: { flex: 1 },} )
+        , React.createElement('button', { onClick: refreshBaseItems, style: { background: "#0a0e1a", border: "1px solid #18305a", borderRadius: 6, color: "#4060a0", padding: "5px 9px", fontSize: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, flexShrink: 0 },}, "↻ SYNC" )
+        , React.createElement('button', { onClick: () => setResetConfirm(true), style: { background: "#1a0e0e", border: "1px solid #3a1818", borderRadius: 6, color: "#804040", padding: "5px 9px", fontSize: 10, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, flexShrink: 0 },}, "↺ RESET" )
       )
 
       /* Sync Bar */
@@ -2341,7 +2424,7 @@ function StockAnalyzer() {
         )
         /* Search + view toggle row */
         , React.createElement('div', { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "center" },}
-          , React.createElement('input', { value: search, onChange: e => setSearch(e.target.value), placeholder: "Search by name or tag…"    , style: { flex: 1, padding: "11px 14px", background: "#0f0c14", border: "1px solid #2a1f35", borderRadius: 10, color: "#e8ddd0", fontSize: 15, fontWeight: 600, fontFamily: "inherit", outline: "none", boxSizing: "border-box" },} )
+          , React.createElement('input', { value: search, onChange: e => { setSearchInput(e.target.value); clearTimeout(searchDebounceRef.current); searchDebounceRef.current = setTimeout(() => setSearch(e.target.value), 300); }, placeholder: "Search by name or tag…"    , style: { flex: 1, padding: "11px 14px", background: "#0f0c14", border: "1px solid #2a1f35", borderRadius: 10, color: "#e8ddd0", fontSize: 15, fontWeight: 600, fontFamily: "inherit", outline: "none", boxSizing: "border-box" },} )
           , React.createElement('button', { onClick: () => setViewMode(v => v === "list" ? "lookbook" : "list"),
             title: viewMode === "lookbook" ? "Switch to List" : "Switch to Lookbook",
             style: { flexShrink: 0, background: viewMode === "list" ? "#1a1228" : "#0f0c14", border: `1px solid ${viewMode === "list" ? "#6a4a8a" : "#2a1f35"}`, borderRadius: 10, color: viewMode === "list" ? "#c4a0e0" : "#5a4a6a", padding: "10px 14px", fontSize: 17, cursor: "pointer", lineHeight: 1 },}
