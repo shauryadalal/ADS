@@ -6,6 +6,8 @@
   <title>Anjali Design Studio Stock Intelligence V11.0</title>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
   <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
   <style>
 
     /* ── Dark theme ──────────────────────────────────────────── */
@@ -317,6 +319,37 @@ function liveRate(c, rate24K) {
   return rate24K * (c.rate / BASE_24K);
 }
 
+function calcKaratPrice(item, karatRate) {
+  const gnw = (item.components || []).filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+  return (item.components || []).reduce((sum, c) => {
+    if (c.category === "gold") return sum + (parseFloat(c.weight) || 0) * karatRate;
+    if (c.category === "labour" && !c._priceOverride) return sum + gnw * (parseFloat(c.rate) || 1500);
+    return sum + (c.price || 0);
+  }, 0);
+}
+
+function labDiamondRate(ctWeight) {
+  if (ctWeight > 2) return 25000;
+  if (ctWeight >= 1.5) return 22500;
+  return 20000;
+}
+
+function calcLabKaratPrice(item, karatRate) {
+  const gnw = (item.components || []).filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+  return (item.components || []).reduce((sum, c) => {
+    if (c.category === "gold") return sum + (parseFloat(c.weight) || 0) * karatRate;
+    if (c.category === "labour" && !c._priceOverride) return sum + gnw * (parseFloat(c.rate) || 1500);
+    if (c.category === "diamond") return sum + (parseFloat(c.weight) || 0) * labDiamondRate(parseFloat(c.weight) || 0);
+    return sum + (c.price || 0);
+  }, 0);
+}
+
+function isRealDiamondPiece(item) {
+  const name = (item.name || "").toLowerCase();
+  if (name.includes("lab") || name.includes("cvd") || name.includes(" lg ") || name.includes("lg ") || /\blg\b/.test(name)) return false;
+  return (item.components || []).some(c => c.category === "diamond" && (parseFloat(c.rate) || 0) > 25000);
+}
+
 // ── Password Modal ────────────────────────────────────────────
 function PasswordModal({ onSubmit, onCancel, error }) {
   const [val, setVal] = useState("");
@@ -372,7 +405,7 @@ function SellForm({ item, goldRate, onSave, onCancel }) {
           , React.createElement('div', { style: { fontSize: 9, color: "var(--c-tx-text2)", letterSpacing: 3, fontWeight: 700, textTransform: "uppercase" },}, "Record Transaction" )
           , React.createElement('div', { style: { fontSize: 14, color: "var(--c-tx-text)", fontWeight: 700 },}, form.itemName || "New Entry")
         )
-        , React.createElement('button', { onClick: () => onSave(form), style: { background: "var(--c-tx-btn2)", border: "1px solid var(--c-tx-border)", borderRadius: 8, color: "var(--c-tx-text)", padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },}, "✓ Save" )
+        , React.createElement('button', { onClick: () => onSave({ ...form, components: item ? (item.components || []) : [], grossWeight: item ? item.gross_weight : null }), style: { background: "var(--c-tx-btn2)", border: "1px solid var(--c-tx-border)", borderRadius: 8, color: "var(--c-tx-text)", padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" },}, "✓ Save" )
       )
       , React.createElement('div', { style: { flex: 1, overflowY: "auto", padding: 16 },}
         /* Type */
@@ -597,6 +630,13 @@ function SalesDashboard({ sales, onClose, onNewEntry, onEditSale, onDeleteSale }
                     , parseFloat(s.oldJewelleryValue) > 0 && React.createElement('span', { style: { fontSize: 10, background: "var(--c-other-bg)", border: "1px solid var(--c-border)", borderRadius: 5, padding: "2px 8px", color: "var(--c-text-sub)" },}, "♻️ " , s.oldJewelleryWeight, "g · "  , fmt(s.oldJewelleryValue))
                   )
                   , s.notes ? React.createElement('div', { style: { fontSize: 11, color: "var(--c-text-dim)", marginTop: 6, fontStyle: "italic" },}, s.notes) : null
+                  , s.components && s.components.length > 0 && React.createElement('div', { style: { marginTop: 8, borderTop: "1px solid var(--c-border-dim)", paddingTop: 8 },}
+                    , React.createElement('div', { style: { fontSize: 9, color: "var(--c-text-dim)", letterSpacing: 2, fontWeight: 700, marginBottom: 6, textTransform: "uppercase" },}, "Components")
+                    , s.components.map((c, i) => React.createElement('div', { key: i, style: { display: "flex", justifyContent: "space-between", alignItems: "baseline", fontSize: 11, color: "var(--c-text-sub)", marginBottom: 3 },}
+                      , React.createElement('span', null, c.name, (c.weight && c.weight > 0) ? React.createElement('span', { style: { color: "var(--c-text-dim)", marginLeft: 4 },}, c.weight, c.category === "diamond" ? "ct" : "g") : null)
+                      , React.createElement('span', { style: { fontWeight: 700, color: "var(--c-text-sub)", fontVariantNumeric: "tabular-nums" },}, "₹", Math.round(c.price || 0).toLocaleString("en-IN"))
+                    ))
+                  )
                 )
               )
             )
@@ -1176,18 +1216,28 @@ function Reports({ sales, purchases, repairs, onClose, onExportSales, onExportPu
 }
 
 // ── Gold Rate Bar ──────────────────────────────────────────────
-function GoldRateBar({ goldRate, setGoldRate }) {
+function GoldRateBar({ goldRate, setGoldRate, rateSilver, onSilverRateChange }) {
   const [editing, setEditing] = useState(false);
   const [input, setInput] = useState(String(goldRate));
   const rateChanged = goldRate !== BASE_24K;
   const rate18K = goldRate * 0.76;
-  const rate14K = goldRate * 0.59;
+  const rate14KAuto = goldRate * 0.59;
 
   const commit = () => {
     const val = parseFloat(input.replace(/,/g, ""));
     if (!isNaN(val) && val > 0) setGoldRate(val);
     else setInput(String(goldRate));
     setEditing(false);
+  };
+
+  const [editingSilv, setEditingSilv] = useState(false);
+  const [inputSilv,   setInputSilv]   = useState(String(rateSilver));
+  React.useEffect(() => { if (!editingSilv) setInputSilv(String(rateSilver)); }, [rateSilver, editingSilv]);
+  const commitSilv = () => {
+    const v = parseFloat(inputSilv.replace(/,/g, ""));
+    if (!isNaN(v) && v > 0) onSilverRateChange(v);
+    else setInputSilv(String(rateSilver));
+    setEditingSilv(false);
   };
 
   return (
@@ -1219,7 +1269,26 @@ function GoldRateBar({ goldRate, setGoldRate }) {
         )
         , React.createElement('div', { style: { flex: 1, background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 8, padding: "10px 12px" },}
           , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", letterSpacing: 2, marginBottom: 6, fontWeight: 700 },}, "14K / g"  )
-          , React.createElement('div', { style: { color: rateChanged ? "var(--c-amb-text)" : "var(--c-text-dim)", fontSize: 16, fontWeight: 700 },}, "₹", Math.round(rate14K).toLocaleString("en-IN"))
+          , React.createElement('div', { style: { color: rateChanged ? "var(--c-amb-text)" : "var(--c-text-dim)", fontSize: 16, fontWeight: 700 },}, "₹", Math.round(rate14KAuto).toLocaleString("en-IN"))
+        )
+      )
+      , React.createElement('div', { style: { marginTop: 10 } }
+        , React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-dim)", letterSpacing: 2, marginBottom: 6, fontWeight: 700 },}, "SILVER RATE")
+        , React.createElement('div', { style: { maxWidth: 140 } }
+          , React.createElement('div', { style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 8, padding: "10px 12px" },}
+            , React.createElement('div', { style: { fontSize: 10, color: "var(--c-blue-text2)", letterSpacing: 2, marginBottom: 6, fontWeight: 700 },}, "SILVER / g")
+            , editingSilv ? (
+              React.createElement('input', { value: inputSilv, onChange: e => setInputSilv(e.target.value),
+                onBlur: commitSilv,
+                onKeyDown: e => { if (e.key === "Enter") commitSilv(); if (e.key === "Escape") { setInputSilv(String(rateSilver)); setEditingSilv(false); }},
+                autoFocus: true, style: { width: "100%", background: "none", border: "none", borderBottom: "1px solid var(--c-blue-brd)", color: "var(--c-blue-text)", fontSize: 18, fontWeight: 800, outline: "none", fontFamily: "inherit", padding: "2px 0" },} )
+            ) : (
+              React.createElement('button', { onClick: () => { setInputSilv(String(rateSilver)); setEditingSilv(true); }, style: { background: "none", border: "none", padding: 0, cursor: "pointer", display: "flex", alignItems: "center", gap: 6 },}
+                , React.createElement('span', { style: { color: "var(--c-blue-text)", fontSize: 18, fontWeight: 800, fontFamily: "inherit" },}, "₹", Number(rateSilver).toLocaleString("en-IN"))
+                , React.createElement('span', { style: { fontSize: 13, color: "var(--c-blue-text2)" },}, "✎")
+              )
+            )
+          )
         )
       )
     )
@@ -1270,28 +1339,76 @@ function LookbookThumb({ src, name }) {
   );
 }
 
-// Photo uploader — uploads to Cloudinary, stores URL in Firebase
+// ── Crop modal — wraps Cropper.js ─────────────────────────────
+function CropModal({ src, onConfirm, onCancel }) {
+  const imgRef = React.useRef(null);
+  const cropperRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (!imgRef.current) return;
+    cropperRef.current = new Cropper(imgRef.current, {
+      viewMode: 1, autoCropArea: 0.9, movable: true, zoomable: true, rotatable: false,
+    });
+    return () => { if (cropperRef.current) { cropperRef.current.destroy(); cropperRef.current = null; } };
+  }, [src]);
+
+  function confirm() {
+    if (!cropperRef.current) return;
+    cropperRef.current.getCroppedCanvas({ maxWidth: 1400, maxHeight: 1400 })
+      .toBlob(blob => onConfirm(new File([blob], "photo.jpg", { type: "image/jpeg" })), "image/jpeg", 0.92);
+  }
+
+  return (
+    React.createElement('div', { style: { position: "fixed", inset: 0, background: "#000", zIndex: 3000, display: "flex", flexDirection: "column" },}
+      , React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 16px", background: "var(--c-bg-header)", borderBottom: "1px solid var(--c-border)", flexShrink: 0 },}
+        , React.createElement('button', { onClick: onCancel, style: { background: "none", border: "1px solid var(--c-border2)", borderRadius: 8, color: "var(--c-text-dim)", padding: "7px 16px", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 },}, "Cancel")
+        , React.createElement('span', { style: { color: "var(--c-text)", fontWeight: 700, fontSize: 14, letterSpacing: 1 },}, "Crop Photo")
+        , React.createElement('button', { onClick: confirm, style: { background: "var(--c-amb-bg)", border: "1px solid var(--c-amb-border)", borderRadius: 8, color: "var(--c-amb-text)", padding: "7px 16px", fontSize: 13, cursor: "pointer", fontFamily: "inherit", fontWeight: 700 },}, "✓ Use Photo")
+      )
+      , React.createElement('div', { style: { flex: 1, overflow: "hidden", background: "#111" },}
+        , React.createElement('img', { ref: imgRef, src: src, style: { maxWidth: "100%", display: "block" },} )
+      )
+    )
+  );
+}
+
+// ── Photo uploader — Gallery + Camera, crops before uploading ──
 function PhotoUploader({ currentSrc, onUpload, onRemove }) {
   const [status, setStatus] = useState("idle");
   const [errMsg, setErrMsg] = useState("");
-  async function handleFile(e) {
+  const [cropSrc, setCropSrc] = useState(null);
+
+  function handleFileSelected(e) {
     const f = e.target.files[0];
     if (!f) return;
+    e.target.value = "";
+    setCropSrc(URL.createObjectURL(f));
+  }
+
+  async function handleCropped(croppedFile) {
+    setCropSrc(null);
     setStatus("uploading"); setErrMsg("");
     try {
-      const url = await uploadToCloudinary(f);
+      const url = await uploadToCloudinary(croppedFile);
       await onUpload(url);
       setStatus("idle");
     } catch(err) {
       setStatus("error");
       setErrMsg(err.message);
     }
-    e.target.value = "";
   }
+
+  function cancelCrop() {
+    URL.revokeObjectURL(cropSrc);
+    setCropSrc(null);
+  }
+
   const busy = status === "uploading";
-  const btnStyle = { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "13px", background: busy ? "var(--c-bg-input)" : "var(--c-blue-bg)", border: `1px solid ${busy ? "var(--c-border)" : "var(--c-blue-brd)"}`, borderRadius: 10, color: busy ? "var(--c-text-dim)" : "var(--c-blue-text)", fontSize: 13, fontWeight: 700, cursor: busy ? "default" : "pointer", fontFamily: "inherit", boxSizing: "border-box" };
+  const btnBase = { flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "11px", background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 10, color: "var(--c-blue-text)", fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", position: "relative", boxSizing: "border-box" };
+
   return (
     React.createElement('div', { style: { marginBottom: 12 },}
+      , cropSrc && React.createElement(CropModal, { src: cropSrc, onConfirm: handleCropped, onCancel: cancelCrop,} )
       , currentSrc ? (
         React.createElement('div', { style: { borderRadius: 10, overflow: "hidden", border: "1px solid var(--c-border)", marginBottom: 8, position: "relative" },}
           , React.createElement('img', { src: currentSrc, alt: "current", style: { width: "100%", maxHeight: 200, objectFit: "cover", display: "block" },} )
@@ -1300,25 +1417,27 @@ function PhotoUploader({ currentSrc, onUpload, onRemove }) {
       ) : (
         React.createElement('div', { style: { background: "var(--c-bg-input)", border: "1px dashed #3a2a4a", borderRadius: 10, padding: "20px", textAlign: "center", marginBottom: 8 },}
           , React.createElement('div', { style: { fontSize: 28, opacity: 0.2, marginBottom: 6 },}, "📷")
-          , React.createElement('div', { style: { fontSize: 11, color: "var(--c-text-dim)", fontWeight: 600 },}, "No photo yet"  )
+          , React.createElement('div', { style: { fontSize: 11, color: "var(--c-text-dim)", fontWeight: 600 },}, "No photo yet" )
         )
       )
-      , status === "error" && (
-        React.createElement('div', { style: { background: "var(--c-danger-bg)", border: "1px solid var(--c-danger-brd)", borderRadius: 8, padding: "8px 12px", marginBottom: 8, fontSize: 11, color: "var(--c-danger-text)" },}, "⚠ "
-           , errMsg
-        )
-      )
+      , status === "error" && React.createElement('div', { style: { background: "var(--c-danger-bg)", border: "1px solid var(--c-danger-brd)", borderRadius: 8, padding: "8px 12px", marginBottom: 8, fontSize: 11, color: "var(--c-danger-text)" },}, "⚠ ", errMsg)
       , busy ? (
-        React.createElement('div', { style: btnStyle,}, React.createElement('span', null, "⏳"), React.createElement('span', null, "Uploading…"))
+        React.createElement('div', { style: { display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "13px", background: "var(--c-bg-input)", border: "1px solid var(--c-border)", borderRadius: 10, color: "var(--c-text-dim)", fontSize: 13, fontWeight: 700, boxSizing: "border-box" },}
+          , React.createElement('span', null, "⏳"), React.createElement('span', null, "Uploading…")
+        )
       ) : (
-        React.createElement('label', { style: { ...btnStyle, position: "relative" },}
-          , React.createElement('span', null, "📷")
-          , React.createElement('span', null, currentSrc ? "Change Photo" : "Upload Photo from Device")
-          , React.createElement('input', { type: "file", accept: "image/*", onChange: handleFile,
-            style: { position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" },} )
+        React.createElement('div', { style: { display: "flex", gap: 8 },}
+          , React.createElement('label', { style: btnBase,}
+            , React.createElement('span', null, "🖼"), React.createElement('span', null, "Gallery")
+            , React.createElement('input', { type: "file", accept: "image/*", onChange: handleFileSelected, style: { position: "absolute", inset: 0, opacity: 0, cursor: "pointer" },} )
+          )
+          , React.createElement('label', { style: btnBase,}
+            , React.createElement('span', null, "📸"), React.createElement('span', null, "Camera")
+            , React.createElement('input', { type: "file", accept: "image/*", capture: "environment", onChange: handleFileSelected, style: { position: "absolute", inset: 0, opacity: 0, cursor: "pointer" },} )
+          )
         )
       )
-      , React.createElement('div', { style: { fontSize: 10, color: "#3a2a5a", marginTop: 5, textAlign: "center" },}, "Uploads to Cloudinary · appears on all devices"       )
+      , React.createElement('div', { style: { fontSize: 10, color: "#3a2a5a", marginTop: 5, textAlign: "center" },}, "Crop before uploading · syncs across devices")
     )
   );
 }
@@ -1341,7 +1460,7 @@ function EField({ value, onChange, type = "text", style = {} }) {
 }
 
 // ── Item Detail Screen ─────────────────────────────────────────
-function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePhoto, onSell, requireAuth }) {
+function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePhoto, onSell, requireAuth, rateSilver }) {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1350,12 +1469,19 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
   const currentPhoto = photos[photoKey] || null;
 
   const working = editMode ? draft : item;
-  const liveComps = working.components.map(c => ({ ...c, livePrice: livePrice(c, goldRate), liveRate: liveRate(c, goldRate) }));
+  const goldNetWeight = working.components.filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+  const liveComps = working.components.map(c => {
+    const lp = (c.category === "labour" && !c._priceOverride)
+      ? parseFloat((goldNetWeight * (parseFloat(c.rate) || 1500)).toFixed(2))
+      : livePrice(c, goldRate);
+    return { ...c, livePrice: lp, liveRate: liveRate(c, goldRate) };
+  });
   const byCategory = liveComps.reduce((acc, c) => { if (!acc[c.category]) acc[c.category] = []; acc[c.category].push(c); return acc; }, {});
   const liveTotal = liveComps.reduce((s, c) => s + (c.livePrice || 0), 0);
   const diff = liveTotal - item.total;
   const rateChanged = goldRate !== BASE_24K;
   const badge = kindBadge[item.kind];
+  const isRealDiamond = isRealDiamondPiece(item);
 
   function startEdit() {
     setDraft(JSON.parse(JSON.stringify(item)));
@@ -1363,8 +1489,16 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
   }
   function cancelEdit() { setEditMode(false); setDraft(null); }
   function saveEdit() {
-    const newTotal = draft.components.reduce((s, c) => s + (parseFloat(c.price) || 0), 0);
-    const saved = { ...draft, total: newTotal };
+    const draftGoldNetWeight = draft.components.filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+    const finalComps = draft.components.map(c => {
+      if (c.category === "labour" && !c._priceOverride) {
+        const lp = parseFloat((draftGoldNetWeight * (parseFloat(c.rate) || 1500)).toFixed(2));
+        return { ...c, weight: draftGoldNetWeight, price: lp };
+      }
+      return c;
+    });
+    const newTotal = finalComps.reduce((s, c) => s + (parseFloat(c.price) || 0), 0);
+    const saved = { ...draft, components: finalComps, total: newTotal };
     onSave(saved);
     setEditMode(false);
     setDraft(null);
@@ -1375,7 +1509,7 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
   }
   function setCompField(idx, field, val) {
     setDraft(d => {
-      const comps = d.components.map((c, i) => {
+      let comps = d.components.map((c, i) => {
         if (i !== idx) return c;
         if (field === "_resetPrice") {
           const w = parseFloat(c.weight), r = parseFloat(c.rate);
@@ -1393,6 +1527,14 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
         }
         return updated;
       });
+      // When a gold component's weight changes, recompute labour from new total gold net weight
+      if (field === "weight" && d.components[idx] && d.components[idx].category === "gold") {
+        const newGoldNetWeight = comps.filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+        comps = comps.map(c => {
+          if (c.category !== "labour" || c._priceOverride) return c;
+          return { ...c, weight: newGoldNetWeight, price: parseFloat((newGoldNetWeight * (parseFloat(c.rate) || 1500)).toFixed(2)) };
+        });
+      }
       return { ...d, components: comps };
     });
   }
@@ -1494,7 +1636,7 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
                   )
                   , c.category === "gold" && React.createElement('div', { style: { display: "flex", gap: 4, marginBottom: 8 },}
                     , ["14K","18K","22K","24K"].map(k => {
-                      const mul = { "14K": 0.59, "18K": 0.76, "22K": 0.916, "24K": 1 }[k];
+                      const mul = { "14K": 0.59, "18K": 0.76, "22K": 0.92, "24K": 1 }[k];
                       const kRate = parseFloat((goldRate * mul).toFixed(1));
                       const active = Math.abs((c.rate != null ? parseFloat(c.rate) : 0) - kRate) < 2;
                       return React.createElement('button', { key: k, onClick: () => setCompField(idx, "rate", kRate),
@@ -1523,6 +1665,10 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
                       , (c.category === "gold" && c.weight && c.rate) ? (
                         React.createElement('div', { style: { background: "var(--c-amb-bg2)", border: "1px solid var(--c-amb-border)", borderRadius: 6, color: "var(--c-amb-text)", fontFamily: "inherit", fontSize: 12, padding: "5px 6px", textAlign: "right", fontWeight: 700 },}
                           , fmt(livePrice(c, goldRate))
+                        )
+                      ) : (c.category === "labour" && !c._priceOverride) ? (
+                        React.createElement('div', { style: { background: "var(--c-bg-input)", border: "1px solid var(--c-border-dim)", borderRadius: 6, color: "var(--c-text-dim)", fontFamily: "inherit", fontSize: 12, padding: "5px 6px", textAlign: "right", fontWeight: 700 },}
+                          , fmt(goldNetWeight * (parseFloat(c.rate) || 1500))
                         )
                       ) : (
                         React.createElement(EField, { value: c.price != null ? c.price : 0, onChange: v => setCompField(idx, "price", parseFloat(v) || 0), type: "number",} )
@@ -1588,6 +1734,48 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
               , editMode && React.createElement('div', { style: { fontSize: 11, color: "#60a060", marginTop: 4 },}, "← recalculated from components"   )
             )
             , React.createElement('div', { style: { fontSize: 26, color: rateChanged ? "var(--c-amb-text)" : "var(--c-kind-ring)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(liveTotal))
+          )
+        )
+
+        /* Karat Pricing Options */
+        , !editMode && React.createElement('div', { style: { marginBottom: 16 },}
+          , React.createElement('div', { style: { fontSize: 10, letterSpacing: 3, color: "var(--c-text-dim)", textTransform: "uppercase", fontWeight: 700, marginBottom: 8, padding: "0 4px" },}, "If made in…")
+          , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 },}
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "9KT")
+              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.385)))
+              , isRealDiamond && React.createElement('div', null
+                , React.createElement('div', { style: { borderTop: "1px solid var(--c-amb-border)", margin: "5px 0 4px" },} )
+                , React.createElement('div', { style: { fontSize: 8, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
+                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, goldRate * 0.385)))
+              )
+            )
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "14KT")
+              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.59)))
+              , isRealDiamond && React.createElement('div', null
+                , React.createElement('div', { style: { borderTop: "1px solid var(--c-amb-border)", margin: "5px 0 4px" },} )
+                , React.createElement('div', { style: { fontSize: 8, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
+                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, goldRate * 0.59)))
+              )
+            )
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "18KT")
+              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.76)))
+            )
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "22KT")
+              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.92)))
+            )
+            , React.createElement('div', { style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-blue-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "SILVER")
+              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-blue-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, rateSilver || 105)))
+              , isRealDiamond && React.createElement('div', null
+                , React.createElement('div', { style: { borderTop: "1px solid var(--c-blue-brd)", margin: "5px 0 4px" },} )
+                , React.createElement('div', { style: { fontSize: 8, color: "var(--c-blue-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
+                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-blue-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, rateSilver || 105)))
+              )
+            )
           )
         )
       )
@@ -1802,37 +1990,33 @@ function AddItem({ onSave, onCancel, existingItems, goldRate }) {
   function setComp(idx, k, v) {
     setForm(f => {
       const changedComp = f.components[idx];
-      return {
-        ...f,
-        components: f.components.map((c, i) => {
-          if (i === idx && k === "_resetPrice") {
-            const w = parseFloat(c.weight), r = parseFloat(c.rate);
-            return { ...c, _priceOverride: false, price: (w && r) ? parseFloat((w * r).toFixed(2)) : c.price };
+      let comps = f.components.map((c, i) => {
+        if (i === idx && k === "_resetPrice") {
+          const w = parseFloat(c.weight), r = parseFloat(c.rate);
+          return { ...c, _priceOverride: false, price: (w && r) ? parseFloat((w * r).toFixed(2)) : c.price };
+        }
+        if (i !== idx) return c;
+        const updated = { ...c, [k]: v };
+        if (k === "price") {
+          updated._priceOverride = true;
+        } else if (k === "weight" || k === "rate") {
+          if (updated._priceOverride !== true) {
+            const w = parseFloat(k === "weight" ? v : c.weight);
+            const r = parseFloat(k === "rate" ? v : c.rate);
+            if (w && r) { updated.price = parseFloat((w * r).toFixed(2)); updated._priceOverride = false; }
           }
-          if (i !== idx) {
-            if (k === "weight" && changedComp.category === "gold" && c.category === "labour") {
-              const updated = { ...c, weight: v };
-              if (updated._priceOverride !== true) {
-                const w = parseFloat(v), r = parseFloat(c.rate);
-                if (w && r) { updated.price = parseFloat((w * r).toFixed(2)); updated._priceOverride = false; }
-              }
-              return updated;
-            }
-            return c;
-          }
-          const updated = { ...c, [k]: v };
-          if (k === "price") {
-            updated._priceOverride = true;
-          } else if (k === "weight" || k === "rate") {
-            if (updated._priceOverride !== true) {
-              const w = parseFloat(k === "weight" ? v : c.weight);
-              const r = parseFloat(k === "rate" ? v : c.rate);
-              if (w && r) { updated.price = parseFloat((w * r).toFixed(2)); updated._priceOverride = false; }
-            }
-          }
-          return updated;
-        })
-      };
+        }
+        return updated;
+      });
+      // When a gold component's weight changes, sync all labour components to new gold net weight
+      if (k === "weight" && changedComp.category === "gold") {
+        const newGoldNetWeight = comps.filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+        comps = comps.map(c => {
+          if (c.category !== "labour" || c._priceOverride) return c;
+          return { ...c, weight: newGoldNetWeight, price: parseFloat((newGoldNetWeight * (parseFloat(c.rate) || 1500)).toFixed(2)) };
+        });
+      }
+      return { ...f, components: comps };
     });
   }
   function addComp() { setForm(f => ({ ...f, components: [...f.components, { name: "", price: 0, category: "other", weight: "", rate: "", _priceOverride: false }] })); }
@@ -1854,14 +2038,22 @@ function AddItem({ onSave, onCancel, existingItems, goldRate }) {
     if (form.components.length === 0) errs.comps = "Add at least one component";
     setErrors(errs);
     if (Object.keys(errs).length > 0) return;
-    const total = form.components.reduce((s, c) => s + (parseFloat(c.price) || 0), 0);
+    const formGoldNetWeight = form.components.filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+    const finalComponents = form.components.map(c => {
+      if (c.category === "labour" && !c._priceOverride) {
+        const lp = parseFloat((formGoldNetWeight * (parseFloat(c.rate) || 1500)).toFixed(2));
+        return { ...c, weight: formGoldNetWeight, price: lp };
+      }
+      return c;
+    });
+    const total = finalComponents.reduce((s, c) => s + (parseFloat(c.price) || 0), 0);
     onSave({
       id: isNaN(form.id.trim()) ? form.id.trim() : parseInt(form.id.trim()),
       kind: form.kind, name: form.name.trim(),
       gross_weight: form.gross_weight ? parseFloat(form.gross_weight) : null,
       tags: form.tags.split(",").map(t => t.trim()).filter(Boolean),
       total,
-      components: form.components.map(c => ({
+      components: finalComponents.map(c => ({
         name: c.name, price: parseFloat(c.price) || 0, category: c.category,
         ...(c.weight ? { weight: parseFloat(c.weight) } : {}),
         ...(c.rate   ? { rate:   parseFloat(c.rate)   } : {}),
@@ -1989,6 +2181,7 @@ function StockAnalyzer() {
   const searchDebounceRef = React.useRef(null);
   const [selected, setSelected] = useState(null);
   const [goldRate, setGoldRate] = useState(BASE_24K);
+  const [rateSilver, setRateSilver] = useState(105);
   const [filter, setFilter] = useState("all");
   const [items, setItems] = useState(ITEMS);
   const [syncing, setSyncing] = useState(true);
@@ -2069,8 +2262,9 @@ function StockAnalyzer() {
   async function loadSales() {
     try {
       const res = await fetch(fbSalesUrl(""));
-      if (res.ok) { const d = await res.json(); if (d) setSales(Object.values(d)); }
+      if (res.ok) { const d = await res.json(); if (d) { const loaded = Object.values(d); setSales(loaded); return loaded; } }
     } catch (e2) {}
+    return [];
   }
   async function saveSale(sale) {
     const id = "sale_" + Date.now();
@@ -2080,12 +2274,17 @@ function StockAnalyzer() {
     });
     if (!res.ok) throw new Error(`Sale save failed: ${res.status}`);
     setSales(prev => [...prev, { ...sale, id }]);
-    // Remove from inventory
+    // Remove from inventory and track in deletedBaseIds so reconcile won't restore it
     if (sale.itemId && sale.itemKind) {
+      const key = `${sale.itemKind}::${sale.itemId}`;
       const next = items.filter(i => !(String(i.id) === String(sale.itemId) && i.kind === sale.itemKind));
       setItems(next);
       isSavingRef.current = true;
       await fbSet("items", next);
+      if (BASE_KEYS.has(key)) {
+        const existing = await fbGet("deletedBaseIds") || [];
+        await fbSet("deletedBaseIds", [...new Set([...existing, key])]);
+      }
       isSavingRef.current = false;
     }
   }
@@ -2158,24 +2357,28 @@ function StockAnalyzer() {
     setPurchases(prev => prev.filter(p => p.id !== id));
   }
 
-  // ── Reconcile: always apply latest components from code for base items ──
-  // This means fixing stale Firebase data on every load — no manual SYNC needed
-  function reconcile(stored) {
+  function reconcile(stored, deletedIds = new Set()) {
     const baseMap = new Map(ITEMS.map(i => [i.kind + "::" + i.id, i]));
     const storedKeys = new Set(stored.map(i => i.kind + "::" + i.id));
     const reconciled = stored
-      // Drop items that were removed from base
-      .filter(i => BASE_KEYS.has(i.kind + "::" + i.id) || !baseMap.has(i.kind + "::" + i.id))
+      .filter(i => {
+        const key = i.kind + "::" + i.id;
+        if (!baseMap.has(key)) return true;      // user-added: always keep
+        if (!BASE_KEYS.has(key)) return false;    // removed from code: drop
+        if (deletedIds.has(key)) return false;    // sold/deleted: drop
+        return true;
+      })
       .map(i => {
         const base = baseMap.get(i.kind + "::" + i.id);
-        if (!base) return i; // user-added item — keep entirely
-        // Keep stored version (preserves all user edits to components/rates/prices)
-        // Only fall back to base if stored item is missing components entirely
+        if (!base) return i;
         if (!i.components || i.components.length === 0) return base;
         return i;
       });
-    // Add new base items not yet in Firebase
-    const newItems = ITEMS.filter(i => !storedKeys.has(i.kind + "::" + i.id));
+    // Add new base items not yet in Firebase, excluding sold/deleted ones
+    const newItems = ITEMS.filter(i => {
+      const key = i.kind + "::" + i.id;
+      return !storedKeys.has(key) && !deletedIds.has(key);
+    });
     return [...reconciled, ...newItems];
   }
 
@@ -2215,9 +2418,11 @@ function StockAnalyzer() {
   // ── Apply a Firebase snapshot to local state ──────────────────
   function applySnapshot(data) {
     if (!data) return;
-    if (data.items) setItems(reconcile(data.items));
+    const deletedIds = new Set(data.deletedBaseIds || []);
+    if (data.items) setItems(reconcile(data.items, deletedIds));
     // Only update gold rate from remote if not mid-save (avoids poll overwriting local edits)
-    if (data.goldRate && !isSavingRef.current) setGoldRate(parseFloat(data.goldRate));
+    if (data.goldRate   && !isSavingRef.current) setGoldRate(parseFloat(data.goldRate));
+    if (data.rateSilver && !isSavingRef.current) setRateSilver(parseFloat(data.rateSilver));
     setLastSync(new Date());
   }
   async function loadPhotos() {
@@ -2239,8 +2444,11 @@ function StockAnalyzer() {
         // Empty database — push default data now so all devices get it
         await fbSet("items", ITEMS);
         await fbSet("goldRate", BASE_24K);
+        await fbSet("rateSilver", 105);
         setItems(ITEMS);
         setGoldRate(BASE_24K);
+        setRateSilver(105);
+        await loadSales();
       } else {
         let current = await migrateItemIds(data);
         // Push base items that are new in code (not yet in Firebase, not deliberately deleted)
@@ -2254,8 +2462,26 @@ function StockAnalyzer() {
         }
         applySnapshot(current);
         await loadPhotos();
+
+        // Cross-reference with sales: remove any items from stock that already have a sale record
+        const loadedSales = await loadSales();
+        const soldKeys = new Set(
+          loadedSales.map(s => (s.itemKind && s.itemId) ? `${s.itemKind}::${s.itemId}` : null).filter(Boolean)
+        );
+        if (soldKeys.size > 0) {
+          const existingDeleted = new Set(current.deletedBaseIds || []);
+          const newSoldBase = [...soldKeys].filter(k => BASE_KEYS.has(k) && !existingDeleted.has(k));
+          if (newSoldBase.length > 0) {
+            const newDeleted = [...existingDeleted, ...newSoldBase];
+            isSavingRef.current = true;
+            await fbSet("deletedBaseIds", newDeleted);
+            const cleanItems = (current.items || []).filter(i => !soldKeys.has(`${i.kind}::${i.id}`));
+            await fbSet("items", cleanItems);
+            isSavingRef.current = false;
+            setItems(reconcile(cleanItems, new Set(newDeleted)));
+          }
+        }
       }
-      await loadSales();
       await loadCustomers();
       await loadRepairs();
       await loadPurchases();
@@ -2277,7 +2503,7 @@ function StockAnalyzer() {
         const data = await fbGet("");
         if (!data || !data.items) return;
         // Only update if data has actually changed (compare JSON)
-        const snapshot = JSON.stringify({ items: data.items, goldRate: data.goldRate });
+        const snapshot = JSON.stringify({ items: data.items, goldRate: data.goldRate, rateSilver: data.rateSilver });
         if (snapshot !== lastSnapshotRef.current) {
           lastSnapshotRef.current = snapshot;
           applySnapshot(data);
@@ -2354,6 +2580,11 @@ function StockAnalyzer() {
     setTimeout(() => { isSavingRef.current = false; }, 6000);
   }
 
+  async function handleSilverRate(rate) {
+    setRateSilver(rate);
+    try { await fbSet("rateSilver", rate); setLastSync(new Date()); } catch(e) {}
+  }
+
   // Gate any action behind password
   function requireAuth(action) {
     if (unlocked) { action(); return; }
@@ -2388,11 +2619,13 @@ function StockAnalyzer() {
     try {
       await fbSet("items",    ITEMS);
       await fbSet("goldRate", BASE_24K);
+      await fbSet("rateSilver", 105);
       setFbError(null);
     } catch (e10) { setFbError("Reset failed"); }
     isSavingRef.current = false;
     setItems(ITEMS);
     setGoldRate(BASE_24K);
+    setRateSilver(105);
     setResetConfirm(false);
   }
 
@@ -2461,16 +2694,23 @@ function StockAnalyzer() {
     setTimeout(() => { isSavingRef.current = false; }, 6000);
   }
 
+  async function handleSilverRate(rate) {
+    setRateSilver(rate);
+    try { await fbSet("rateSilver", rate); setLastSync(new Date()); } catch(e) {}
+  }
+
   async function resetData() {
     isSavingRef.current = true;
     try {
       await fbSet("items",    ITEMS);
       await fbSet("goldRate", BASE_24K);
+      await fbSet("rateSilver", 105);
       setFbError(null);
     } catch (e15) { setFbError("Reset failed"); }
     isSavingRef.current = false;
     setItems(ITEMS);
     setGoldRate(BASE_24K);
+    setRateSilver(105);
     setResetConfirm(false);
   }
 
@@ -2661,7 +2901,7 @@ function StockAnalyzer() {
         onDelete: deletePurchase,} )
       , showReports && React.createElement(Reports, { sales: sales, purchases: purchases, repairs: repairs, onClose: () => setShowReports(false), onExportSales: exportSalesCSV, onExportPurchases: exportPurchasesCSV,} )
       , showAdd && !showSales && !showSellForm && React.createElement(AddItem, { onSave: handleAdd, onCancel: () => setShowAdd(false), existingItems: items, goldRate: goldRate,} )
-      , selected && !showAdd && !showSales && !showSellForm && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
+      , selected && !showAdd && !showSales && !showSellForm && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, rateSilver: rateSilver, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
 
       , React.createElement('div', { style: { display: (selected || showAdd || showSales || showSellForm || showCustomers || showRepairs || showPurchases || showReports) ? "none" : "flex", minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", flexDirection: "column" },}
       /* Header */
@@ -2727,7 +2967,7 @@ function StockAnalyzer() {
       )
 
       /* Gold Rate Bar */
-      , React.createElement(GoldRateBar, { goldRate: goldRate, setGoldRate: handleGoldRate,} )
+      , React.createElement(GoldRateBar, { goldRate: goldRate, setGoldRate: handleGoldRate, rateSilver: rateSilver, onSilverRateChange: handleSilverRate,} )
 
       /* Dashboard */
       , React.createElement(Dashboard, { items: items, goldRate: goldRate,} )
