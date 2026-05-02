@@ -1460,7 +1460,7 @@ function EField({ value, onChange, type = "text", style = {} }) {
 }
 
 // ── Item Detail Screen ─────────────────────────────────────────
-function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePhoto, onSell, requireAuth, rateSilver }) {
+function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePhoto, onSell, requireAuth, rateSilver, onSendToMemo }) {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1576,6 +1576,7 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
             , React.createElement('button', { onClick: () => requireAuth(startEdit), style: { ...btnBase, background: "var(--c-edit-bg)", color: "var(--c-edit-text)", border: "1px solid var(--c-edit-brd)", flex: 1, justifyContent: "center" },}, "✎ Edit" )
             , React.createElement('button', { onClick: () => requireAuth(() => setConfirmDelete(true)), style: { ...btnBase, background: "var(--c-danger-bg)", color: "var(--c-danger-text)", border: "1px solid var(--c-danger-brd)", padding: "8px 14px" },}, "🗑 Delete" )
             , React.createElement('button', { onClick: () => requireAuth(() => onSell(item)), style: { ...btnBase, background: "var(--c-tx-bg)", color: "var(--c-tx-text)", border: "1px solid var(--c-tx-border)", padding: "8px 14px" },}, "💰 Sell" )
+            , onSendToMemo && React.createElement('button', { onClick: () => requireAuth(() => onSendToMemo(item)), style: { ...btnBase, background: "var(--c-blue-bg)", color: "var(--c-blue-text)", border: "1px solid var(--c-blue-brd)", padding: "8px 14px" },}, "📋 Memo" )
           )
         )
       )
@@ -1741,39 +1742,39 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
         , !editMode && React.createElement('div', { style: { marginBottom: 16 },}
           , React.createElement('div', { style: { fontSize: 10, letterSpacing: 3, color: "var(--c-text-dim)", textTransform: "uppercase", fontWeight: 700, marginBottom: 8, padding: "0 4px" },}, "If made in…")
           , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 6 },}
-            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
-              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "9KT")
-              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.385)))
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "12px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 12, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "9KT")
+              , React.createElement('div', { style: { fontSize: 13, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.385)))
               , isRealDiamond && React.createElement('div', null
                 , React.createElement('div', { style: { borderTop: "1px solid var(--c-amb-border)", margin: "5px 0 4px" },} )
-                , React.createElement('div', { style: { fontSize: 8, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
-                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, goldRate * 0.385)))
+                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
+                , React.createElement('div', { style: { fontSize: 12, color: "var(--c-amb-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, goldRate * 0.385)))
               )
             )
-            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
-              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "14KT")
-              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.59)))
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "12px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 12, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "14KT")
+              , React.createElement('div', { style: { fontSize: 13, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.59)))
               , isRealDiamond && React.createElement('div', null
                 , React.createElement('div', { style: { borderTop: "1px solid var(--c-amb-border)", margin: "5px 0 4px" },} )
-                , React.createElement('div', { style: { fontSize: 8, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
-                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, goldRate * 0.59)))
+                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
+                , React.createElement('div', { style: { fontSize: 12, color: "var(--c-amb-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, goldRate * 0.59)))
               )
             )
-            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
-              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "18KT")
-              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.76)))
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "12px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 12, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "18KT")
+              , React.createElement('div', { style: { fontSize: 13, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.76)))
             )
-            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
-              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "22KT")
-              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.92)))
+            , React.createElement('div', { style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "12px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 12, color: "var(--c-amb-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "22KT")
+              , React.createElement('div', { style: { fontSize: 13, color: "var(--c-amb-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, goldRate * 0.92)))
             )
-            , React.createElement('div', { style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 10, padding: "10px 6px", textAlign: "center" },}
-              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-blue-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "SILVER")
-              , React.createElement('div', { style: { fontSize: 11, color: "var(--c-blue-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, rateSilver || 105)))
+            , React.createElement('div', { style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 10, padding: "12px 6px", textAlign: "center" },}
+              , React.createElement('div', { style: { fontSize: 12, color: "var(--c-blue-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 4 },}, "SILVER")
+              , React.createElement('div', { style: { fontSize: 13, color: "var(--c-blue-text)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(calcKaratPrice(item, rateSilver || 105)))
               , isRealDiamond && React.createElement('div', null
                 , React.createElement('div', { style: { borderTop: "1px solid var(--c-blue-brd)", margin: "5px 0 4px" },} )
-                , React.createElement('div', { style: { fontSize: 8, color: "var(--c-blue-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
-                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-blue-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, rateSilver || 105)))
+                , React.createElement('div', { style: { fontSize: 10, color: "var(--c-blue-text2)", letterSpacing: 1, fontWeight: 700, marginBottom: 2 },}, "💎 LAB")
+                , React.createElement('div', { style: { fontSize: 12, color: "var(--c-blue-text2)", fontWeight: 700, fontVariantNumeric: "tabular-nums" },}, fmt(calcLabKaratPrice(item, rateSilver || 105)))
               )
             )
           )
@@ -1955,6 +1956,118 @@ function Dashboard({ items, goldRate }) {
 
         )
       )
+    )
+  );
+}
+
+// ── Memo View ──────────────────────────────────────────────────
+function MemoView({ items, goldRate, onClose, onReturn, onSell }) {
+  const memoItems = items.filter(i => i.memo);
+  const memoTotal = memoItems.reduce((s, item) =>
+    s + item.components.reduce((cs, c) => cs + livePrice(c, goldRate), 0), 0);
+
+  return React.createElement('div', { style: {
+    minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)",
+    fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif",
+    display: "flex", flexDirection: "column"
+  }}
+    , React.createElement('div', { style: {
+        background: "var(--c-bg-header)", borderBottom: "1px solid var(--c-border)",
+        padding: "14px 16px", display: "flex", alignItems: "center",
+        gap: 10, position: "sticky", top: 0, zIndex: 10
+      }}
+      , React.createElement('button', { onClick: onClose, style: {
+          background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)",
+          borderRadius: 8, color: "var(--c-blue-text)", padding: "8px 14px",
+          fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
+        }}, "← Back"
+      )
+      , React.createElement('div', { style: { flex: 1 }}
+        , React.createElement('div', { style: {
+            fontSize: 9, color: "var(--c-text-sub)", letterSpacing: 3, fontWeight: 700, textTransform: "uppercase"
+          }}, "Memo Stock"
+        )
+        , React.createElement('div', { style: {
+            fontSize: 16, color: "var(--c-blue-text)", fontWeight: 800
+          }}, "📋 On Memo · ", memoItems.length, " pieces"
+        )
+      )
+      , React.createElement('div', { style: {
+          fontSize: 14, color: "var(--c-blue-text)", fontWeight: 800,
+          fontVariantNumeric: "tabular-nums", flexShrink: 0
+        }}, fmt(memoTotal)
+      )
+    )
+    , React.createElement('div', { style: { flex: 1, overflowY: "auto", padding: 16 }}
+      , memoItems.length === 0
+        ? React.createElement('div', { style: {
+            textAlign: "center", color: "var(--c-text-dim)",
+            padding: 40, fontSize: 13
+          }}, "No items on memo"
+        )
+        : memoItems.map(item => {
+          const liveTotal = item.components.reduce((s, c) => s + livePrice(c, goldRate), 0);
+          const badge = kindBadge[item.kind];
+          return React.createElement('div', {
+            key: `${item.kind}-${item.id}`,
+            style: {
+              background: "var(--c-bg-panel)", border: "1px solid var(--c-border2)",
+              borderRadius: 10, padding: 14, marginBottom: 8
+            }
+          }
+            , React.createElement('div', { style: {
+                display: "flex", justifyContent: "space-between",
+                alignItems: "flex-start", marginBottom: 10
+              }}
+              , React.createElement('div', { style: { flex: 1, minWidth: 0 }}
+                , React.createElement('div', { style: {
+                    display: "flex", alignItems: "center", gap: 6, marginBottom: 4
+                  }}
+                  , React.createElement('span', { style: {
+                      fontSize: 9, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700
+                    }}, "#", item.id
+                  )
+                  , React.createElement('span', { style: {
+                      fontSize: 9, padding: "1px 6px", borderRadius: 8,
+                      background: badge.bg, border: `1px solid ${badge.border}`,
+                      color: badge.color, fontWeight: 700, letterSpacing: 1
+                    }}, badge.label
+                  )
+                )
+                , React.createElement('div', { style: {
+                    fontSize: 15, color: "var(--c-text-h)", fontWeight: 700,
+                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"
+                  }}, item.name
+                )
+                , item.gross_weight && React.createElement('div', { style: {
+                    fontSize: 11, color: "var(--c-text-sub)", marginTop: 2
+                  }}, item.gross_weight, " g"
+                )
+              )
+              , React.createElement('div', { style: { flexShrink: 0, textAlign: "right", paddingLeft: 12 }}
+                , React.createElement('div', { style: {
+                    fontSize: 15, color: "var(--c-blue-text)", fontWeight: 800,
+                    fontVariantNumeric: "tabular-nums"
+                  }}, fmt(liveTotal)
+                )
+              )
+            )
+            , React.createElement('div', { style: { display: "flex", gap: 8 }}
+              , React.createElement('button', { onClick: () => onReturn(item), style: {
+                  flex: 1, background: "var(--c-bg-btn)", border: "1px solid var(--c-border2)",
+                  borderRadius: 8, color: "var(--c-text-sub)", padding: "7px 12px",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
+                }}, "↩ Return to Stock"
+              )
+              , React.createElement('button', { onClick: () => onSell(item), style: {
+                  background: "var(--c-tx-bg)", border: "1px solid var(--c-tx-border)",
+                  borderRadius: 8, color: "var(--c-tx-text)", padding: "7px 12px",
+                  fontSize: 12, fontWeight: 700, cursor: "pointer", fontFamily: "inherit"
+                }}, "💰 Sell"
+              )
+            )
+          );
+        })
     )
   );
 }
@@ -2207,6 +2320,7 @@ function StockAnalyzer() {
   const [showPurchases, setShowPurchases] = useState(false);
   const [purchases, setPurchases] = useState([]);
   const [showReports, setShowReports] = useState(false);
+  const [showMemo, setShowMemo] = useState(false);
   const [activeForm, setActiveForm] = useState(null); // "customer"|"repair"|"purchase"
   const [editRecord, setEditRecord] = useState(null); // fn to call after unlock
 
@@ -2371,7 +2485,7 @@ function StockAnalyzer() {
       .map(i => {
         const base = baseMap.get(i.kind + "::" + i.id);
         if (!base) return i;
-        if (!i.components || i.components.length === 0) return base;
+        if (!i.components || i.components.length === 0) return { ...base, ...(i.memo ? { memo: true } : {}) };
         return i;
       });
     // Add new base items not yet in Firebase, excluding sold/deleted ones
@@ -2656,10 +2770,10 @@ function StockAnalyzer() {
     setSyncing(false);
   }
 
-  const rings     = items.filter(i => i.kind === "ring");
-  const earrings  = items.filter(i => i.kind === "earring");
-  const bracelets = items.filter(i => i.kind === "bracelet");
-  const necklaces = items.filter(i => i.kind === "necklace");
+  const rings     = items.filter(i => i.kind === "ring"     && !i.memo);
+  const earrings  = items.filter(i => i.kind === "earring"  && !i.memo);
+  const bracelets = items.filter(i => i.kind === "bracelet" && !i.memo);
+  const necklaces = items.filter(i => i.kind === "necklace" && !i.memo);
 
   async function handleSave(updated) {
     const next = items.map(i => (i.id === updated.id && i.kind === updated.kind) ? updated : i);
@@ -2676,6 +2790,24 @@ function StockAnalyzer() {
     setSelected(null);
     isSavingRef.current = true;
     try { await fbSet("items", next); setLastSync(new Date()); setFbError(null); } catch (e14) { setFbError("Delete failed"); }
+    isSavingRef.current = false;
+  }
+
+  async function handleSendToMemo(item) {
+    const next = items.map(i => i.id === item.id && i.kind === item.kind ? { ...i, memo: true } : i);
+    setItems(next); setSelected(null);
+    isSavingRef.current = true;
+    try { await fbSet("items", next); setLastSync(new Date()); setFbError(null); }
+    catch (e_m1) { setFbError("Save failed"); }
+    isSavingRef.current = false;
+  }
+
+  async function handleReturnFromMemo(item) {
+    const next = items.map(i => i.id === item.id && i.kind === item.kind ? { ...i, memo: false } : i);
+    setItems(next);
+    isSavingRef.current = true;
+    try { await fbSet("items", next); setLastSync(new Date()); setFbError(null); }
+    catch (e_m2) { setFbError("Save failed"); }
     isSavingRef.current = false;
   }
 
@@ -2795,6 +2927,7 @@ function StockAnalyzer() {
 
   const KIND_ORDER = { ring: 0, earring: 1, bracelet: 2, necklace: 3 };
   const filtered = items.filter(item => {
+    if (item.memo) return false;
     if (filter !== "all" && item.kind !== filter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -2900,10 +3033,11 @@ function StockAnalyzer() {
         onSave: savePurchase,
         onDelete: deletePurchase,} )
       , showReports && React.createElement(Reports, { sales: sales, purchases: purchases, repairs: repairs, onClose: () => setShowReports(false), onExportSales: exportSalesCSV, onExportPurchases: exportPurchasesCSV,} )
+      , showMemo && React.createElement(MemoView, { items: items, goldRate: goldRate, onClose: () => setShowMemo(false), onReturn: handleReturnFromMemo, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
       , showAdd && !showSales && !showSellForm && React.createElement(AddItem, { onSave: handleAdd, onCancel: () => setShowAdd(false), existingItems: items, goldRate: goldRate,} )
-      , selected && !showAdd && !showSales && !showSellForm && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, rateSilver: rateSilver, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
+      , selected && !showAdd && !showSales && !showSellForm && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, rateSilver: rateSilver, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); }, onSendToMemo: handleSendToMemo,} )
 
-      , React.createElement('div', { style: { display: (selected || showAdd || showSales || showSellForm || showCustomers || showRepairs || showPurchases || showReports) ? "none" : "flex", minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", flexDirection: "column" },}
+      , React.createElement('div', { style: { display: (selected || showAdd || showSales || showSellForm || showCustomers || showRepairs || showPurchases || showReports || showMemo) ? "none" : "flex", minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", flexDirection: "column" },}
       /* Header */
       , React.createElement('div', { style: { background: "var(--c-bg-header)", borderBottom: "1px solid var(--c-border)", padding: "16px 16px 12px" },}
         , React.createElement('div', { style: { display: "flex", justifyContent: "space-between", alignItems: "center" },}
@@ -2941,6 +3075,7 @@ function StockAnalyzer() {
         , React.createElement('button', { onClick: () => setShowRepairs(true), style: { background: "var(--c-gold-bg)", border: "1px solid var(--c-amb-border)", borderRadius: 6, color: "var(--c-amb-text)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "🔧 REPAIRS" )
         , React.createElement('button', { onClick: () => setShowPurchases(true), style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 6, color: "var(--c-blue-text)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📦 BUYS" )
         , React.createElement('button', { onClick: () => setShowReports(true), style: { background: "var(--c-bg-header)", border: "1px solid var(--c-border)", borderRadius: 6, color: "var(--c-text-dim)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📊 REPORTS" )
+        , React.createElement('button', { onClick: () => setShowMemo(true), style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 6, color: "var(--c-blue-text)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📋 MEMO" )
         , React.createElement('button', { onClick: exportInventory, style: { background: "var(--c-bg-panel)", border: "1px solid var(--c-border)", borderRadius: 6, color: "var(--c-text-dim)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "↓ CSV" )
         , React.createElement('div', { style: { flex: 1 },} )
 
@@ -2970,7 +3105,7 @@ function StockAnalyzer() {
       , React.createElement(GoldRateBar, { goldRate: goldRate, setGoldRate: handleGoldRate, rateSilver: rateSilver, onSilverRateChange: handleSilverRate,} )
 
       /* Dashboard */
-      , React.createElement(Dashboard, { items: items, goldRate: goldRate,} )
+      , React.createElement(Dashboard, { items: items.filter(i => !i.memo), goldRate: goldRate,} )
 
       /* Filter + Search */
       , React.createElement('div', { style: { padding: "12px 16px 0", borderBottom: "1px solid var(--c-border-dim)" },}
