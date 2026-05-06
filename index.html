@@ -350,6 +350,16 @@ function isRealDiamondPiece(item) {
   return (item.components || []).some(c => c.category === "diamond" && (parseFloat(c.rate) || 0) > 25000);
 }
 
+function liveItemTotal(item, rate24K) {
+  const comps = item.components || [];
+  const gnw = comps.filter(c => c.category === "gold").reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
+  return comps.reduce((sum, c) => {
+    if (c.category === "gold" && c.weight) return sum + c.weight * (rate24K * (c.rate / BASE_24K));
+    if (c.category === "labour" && !c._priceOverride) return sum + gnw * (parseFloat(c.rate) || 1500);
+    return sum + (c.price || 0);
+  }, 0);
+}
+
 function saleSnapshot(components, rate24K) {
   const gnw = components.filter(c => c.category === "gold")
     .reduce((s, c) => s + (parseFloat(c.weight) || 0), 0);
@@ -392,9 +402,9 @@ function SellForm({ item, goldRate, onSave, onCancel }) {
     itemName: item ? item.name : "",
     itemId: item ? String(item.id) : "",
     itemKind: item ? item.kind : "",
-    stockPrice: item ? Math.round((item.components||[]).reduce((s,c) => s + livePrice(c, goldRate), 0)) : 0,
+    stockPrice: item ? Math.round(liveItemTotal(item, goldRate)) : 0,
     dateSold: today,
-    finalPrice: item ? Math.round((item.components||[]).reduce((s,c) => s + livePrice(c, goldRate), 0)) : 0,
+    finalPrice: item ? Math.round(liveItemTotal(item, goldRate)) : 0,
     cash: 0,
     bank: 0,
     goldWeight: 0,
@@ -1809,7 +1819,7 @@ function Dashboard({ items, goldRate }) {
     const byKind = { ring: 0, earring: 0, bracelet: 0, necklace: 0 };
 
     items.forEach(item => {
-      const itemTotal = item.components.reduce((s, c) => s + livePrice(c, goldRate), 0);
+      const itemTotal = liveItemTotal(item, goldRate);
       sellTotal += itemTotal;
       byKind[item.kind] = (byKind[item.kind] || 0) + itemTotal;
 
@@ -1976,8 +1986,7 @@ function Dashboard({ items, goldRate }) {
 // ── Memo View ──────────────────────────────────────────────────
 function MemoView({ items, goldRate, onClose, onReturn, onSell }) {
   const memoItems = items.filter(i => i.memo);
-  const memoTotal = memoItems.reduce((s, item) =>
-    s + item.components.reduce((cs, c) => cs + livePrice(c, goldRate), 0), 0);
+  const memoTotal = memoItems.reduce((s, item) => s + liveItemTotal(item, goldRate), 0);
 
   return React.createElement('div', { style: {
     minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)",
@@ -2019,7 +2028,7 @@ function MemoView({ items, goldRate, onClose, onReturn, onSell }) {
           }}, "No items on memo"
         )
         : memoItems.map(item => {
-          const liveTotal = item.components.reduce((s, c) => s + livePrice(c, goldRate), 0);
+          const liveTotal = liveItemTotal(item, goldRate);
           const badge = kindBadge[item.kind];
           return React.createElement('div', {
             key: `${item.kind}-${item.id}`,
@@ -3180,7 +3189,7 @@ function StockAnalyzer() {
       , viewMode === "list" && (
         React.createElement('div', { style: { flex: 1, overflowY: "auto", overflowX: "hidden", background: "var(--c-bg)" },}
           , filtered.map((item) => {
-            const liveTotal = item.components.reduce((s, c) => s + livePrice(c, goldRate), 0);
+            const liveTotal = liveItemTotal(item, goldRate);
             const rateChanged = goldRate !== BASE_24K;
             const badge = kindBadge[item.kind];
             return (
@@ -3224,7 +3233,7 @@ function StockAnalyzer() {
         React.createElement('div', { style: { flex: 1, overflowY: "auto", overflowX: "hidden", background: "var(--c-bg)", padding: "10px" },}
           , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },}
             , filtered.map((item) => {
-              const liveTotal = item.components.reduce((s, c) => s + livePrice(c, goldRate), 0);
+              const liveTotal = liveItemTotal(item, goldRate);
               const rateChanged = goldRate !== BASE_24K;
               const badge = kindBadge[item.kind];
               return (
