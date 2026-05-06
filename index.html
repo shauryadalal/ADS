@@ -1630,10 +1630,6 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
               ? React.createElement(EField, { value: draft.gross_weight, onChange: v => setDraftField("gross_weight", v), type: "number", style: { fontSize: 18, fontWeight: 800, color: "var(--c-text-h)" },} )
               : React.createElement('div', { style: { fontSize: 20, color: "var(--c-text-h)", fontWeight: 800 },}, working.gross_weight ? `${working.gross_weight} g` : "—")
           )
-          , React.createElement('div', { style: { textAlign: "right" },}
-            , React.createElement('div', { style: { fontSize: 11, color: "var(--c-comp-sub)", fontWeight: 600, marginBottom: 4, letterSpacing: 1, textTransform: "uppercase" },}, "Base Total" )
-            , React.createElement('div', { style: { fontSize: 18, color: "var(--c-text-h)", fontWeight: 800, fontVariantNumeric: "tabular-nums" },}, fmt(item.total))
-          )
         )
 
         /* Components */
