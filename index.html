@@ -67,6 +67,24 @@
 
 const BASE_24K = 16480;
 
+// Returns [{url, slot}] for all photos of an item (slot 0 = primary)
+function getItemPhotos(photos, item) {
+  const base = `${item.kind}__${item.id}`;
+  const out = [];
+  if (photos[base]) out.push({ url: photos[base], slot: 0 });
+  for (let i = 1; i <= 2; i++) {
+    const k = `${base}__${i}`;
+    if (photos[k]) out.push({ url: photos[k], slot: i });
+  }
+  return out;
+}
+
+const STATUS_CONFIG = {
+  in_stock: { label: "In Stock",           short: "IN STOCK",  color: "var(--c-tx-text)",   bg: "var(--c-tx-bg)",   border: "var(--c-tx-border)"  },
+  approval: { label: "Sent for Approval",  short: "APPROVAL",  color: "var(--c-amb-text)",  bg: "var(--c-gold-bg)", border: "var(--c-amb-border)" },
+  repair:   { label: "At Vendor / Repair", short: "AT VENDOR", color: "var(--c-blue-text)", bg: "var(--c-blue-bg)", border: "var(--c-blue-brd)"   },
+};
+
 // ── DATA ──────────────────────────────────────────────────────
 const ITEMS = [
   // ── RINGS (1–31, 38a–38n) ──────────────────────────────────
@@ -373,6 +391,70 @@ function saleSnapshot(components, rate24K) {
   }));
 }
 
+// ── Status Badge ──────────────────────────────────────────────
+function StatusBadge({ status, size }) {
+  if (!status || status === "in_stock") return null;
+  const cfg = STATUS_CONFIG[status];
+  if (!cfg) return null;
+  const fs = size === "lg" ? 10 : 8;
+  return React.createElement('span', {
+    style: { fontSize: fs, padding: "1px 6px", borderRadius: 8, background: cfg.bg, border: `1px solid ${cfg.border}`, color: cfg.color, fontWeight: 700, letterSpacing: 1, whiteSpace: "nowrap", flexShrink: 0 }
+  }, cfg.short);
+}
+
+// ── Status Modal ──────────────────────────────────────────────
+function StatusModal({ item, onSave, onCancel }) {
+  const today = new Date().toISOString().split("T")[0];
+  const [status, setStatus] = useState(item.status || "in_stock");
+  const [sentTo, setSentTo] = useState((item.statusInfo && item.statusInfo.sentTo) || "");
+  const [date, setDate] = useState((item.statusInfo && item.statusInfo.date) || today);
+  const [challanNo, setChallanNo] = useState((item.statusInfo && item.statusInfo.challanNo) || "");
+
+  function save() {
+    const newInfo = status === "in_stock" ? null : { sentTo: sentTo.trim(), date, challanNo: challanNo.trim() };
+    onSave({ status, statusInfo: newInfo });
+  }
+
+  const inp = { width: "100%", background: "var(--c-bg-input)", border: "1px solid var(--c-border)", borderRadius: 6, color: "var(--c-text)", fontSize: 14, padding: "8px 10px", outline: "none", fontFamily: "inherit", boxSizing: "border-box" };
+  const lbl = { fontSize: 10, color: "var(--c-text-dim)", letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", marginBottom: 5, display: "block" };
+
+  return (
+    React.createElement('div', { style: { position: "fixed", inset: 0, background: "#000000cc", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 24 } }
+      , React.createElement('div', { style: { background: "var(--c-bg-panel)", border: "1px solid var(--c-border2)", borderRadius: 16, padding: 24, width: "100%", maxWidth: 360 } }
+        , React.createElement('div', { style: { fontSize: 12, letterSpacing: 2, color: "var(--c-text-sub)", fontWeight: 700, marginBottom: 4, textTransform: "uppercase" } }, "📍 Item Location")
+        , React.createElement('div', { style: { fontSize: 13, color: "var(--c-text-dim)", marginBottom: 18, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } }, item.name)
+        , React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 } }
+          , Object.entries(STATUS_CONFIG).map(([val, cfg]) =>
+            React.createElement('button', {
+              key: val,
+              onClick: () => setStatus(val),
+              style: { background: status === val ? cfg.bg : "var(--c-bg-btn)", border: `1px solid ${status === val ? cfg.border : "var(--c-border2)"}`, borderRadius: 8, color: status === val ? cfg.color : "var(--c-text-dim)", padding: "10px 14px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", textAlign: "left" }
+            }, cfg.label)
+          )
+        )
+        , status !== "in_stock" && React.createElement('div', { style: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 18, background: "var(--c-bg-btn)", border: "1px solid var(--c-border)", borderRadius: 10, padding: 14 } }
+          , React.createElement('div', null
+            , React.createElement('label', { style: lbl }, "Sent To")
+            , React.createElement('input', { value: sentTo, onChange: e => setSentTo(e.target.value), placeholder: "Customer or vendor name", style: inp })
+          )
+          , React.createElement('div', null
+            , React.createElement('label', { style: lbl }, "Date Sent")
+            , React.createElement('input', { type: "date", value: date, onChange: e => setDate(e.target.value), style: inp })
+          )
+          , React.createElement('div', null
+            , React.createElement('label', { style: lbl }, "Challan No.")
+            , React.createElement('input', { value: challanNo, onChange: e => setChallanNo(e.target.value), placeholder: "e.g. 25", style: inp })
+          )
+        )
+        , React.createElement('div', { style: { display: "flex", gap: 8 } }
+          , React.createElement('button', { onClick: save, style: { flex: 1, background: "var(--c-tx-btn2)", border: "1px solid var(--c-tx-border)", borderRadius: 8, color: "var(--c-tx-text)", padding: "10px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" } }, "✓ Save")
+          , React.createElement('button', { onClick: onCancel, style: { background: "var(--c-bg-btn)", border: "1px solid var(--c-border2)", borderRadius: 8, color: "var(--c-text-dim)", padding: "10px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", fontFamily: "inherit" } }, "Cancel")
+        )
+      )
+    )
+  );
+}
+
 // ── Password Modal ────────────────────────────────────────────
 function PasswordModal({ onSubmit, onCancel, error }) {
   const [val, setVal] = useState("");
@@ -473,9 +555,22 @@ function SellForm({ item, goldRate, onSave, onCancel }) {
             , React.createElement('div', { style: { fontSize: 10, color: "var(--c-amb-text2)", whiteSpace: "nowrap" },}, "Discount ₹")
             , React.createElement('input', { type: "number", value: form.discount||"", onChange: e => f("discount", parseFloat(e.target.value)||0), placeholder: "0", style: { flex: 1, background: "var(--c-amb-bg2)", border: "1px solid var(--c-amb-border)", borderRadius: 6, color: "var(--c-amb-text)", fontSize: 14, padding: "6px 10px", outline: "none", fontFamily: "inherit", boxSizing: "border-box" },})
           )
-          , React.createElement('div', { style: { fontSize: 11, color: form.stockPrice > 0 ? (form.finalPrice >= form.stockPrice ? "var(--c-tx-text)" : "var(--c-danger-text)") : "var(--c-amb-text2)", marginTop: 6 },}
-            , form.stockPrice > 0 ? `${form.finalPrice >= form.stockPrice ? "+" : ""}${fmt(form.finalPrice - form.stockPrice)} vs stock price` : ""
-          )
+          , form.stockPrice > 0 && (function() {
+              const diff = (parseFloat(form.finalPrice) || 0) - (parseFloat(form.stockPrice) || 0);
+              const pct  = ((diff / form.stockPrice) * 100).toFixed(1);
+              const up   = diff >= 0;
+              const col  = up ? "var(--c-tx-text)" : "var(--c-danger-text)";
+              return React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 10, marginTop: 8 } }
+                , React.createElement('div', { style: { flex: 1, background: up ? "var(--c-tx-bg)" : "var(--c-danger-bg)", border: "1px solid " + (up ? "var(--c-tx-border)" : "var(--c-danger-brd)"), borderRadius: 7, padding: "6px 10px" } }
+                  , React.createElement('div', { style: { fontSize: 9, color: col, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", opacity: 0.7, marginBottom: 2 } }, up ? "Profit" : "Loss")
+                  , React.createElement('div', { style: { fontSize: 15, color: col, fontWeight: 800, fontVariantNumeric: "tabular-nums" } }, (up ? "+" : "") + fmt(diff))
+                )
+                , React.createElement('div', { style: { flex: 1, background: up ? "var(--c-tx-bg)" : "var(--c-danger-bg)", border: "1px solid " + (up ? "var(--c-tx-border)" : "var(--c-danger-brd)"), borderRadius: 7, padding: "6px 10px" } }
+                  , React.createElement('div', { style: { fontSize: 9, color: col, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", opacity: 0.7, marginBottom: 2 } }, "Markup on cost")
+                  , React.createElement('div', { style: { fontSize: 15, color: col, fontWeight: 800 } }, (up ? "+" : "") + pct + "%")
+                )
+              );
+            })()
         )
         /* Payment received */
         , React.createElement('div', { style: { background: "var(--c-diamond-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 10, padding: 14, marginBottom: 14 },}
@@ -794,7 +889,10 @@ function CustomerBook({ customers, sales, onClose, onSave, onDelete, requireAuth
     const cust = customers.find(c => c.id === selected);
     if (!cust) { setSelected(null); return null; }
     const custSales = sales.filter(s => s.customerId === cust.id || s.customerName === cust.name);
-    const totalSpend = custSales.filter(s => s.type === "sale").reduce((a, s) => a + (parseFloat(s.finalPrice)||0), 0);
+    const saleSalesOnly = custSales.filter(s => s.type === "sale");
+    const totalSpend = saleSalesOnly.reduce((a, s) => a + (parseFloat(s.finalPrice)||0), 0);
+    const lastSale = [...saleSalesOnly].sort((a, b) => (b.createdAt||b.dateSold||"").localeCompare(a.createdAt||a.dateSold||""))[0];
+    const lastPurchaseDate = lastSale ? fmtDate(lastSale.createdAt || lastSale.dateSold) : null;
     return (
       React.createElement('div', { style: { minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", display: "flex", flexDirection: "column" },}
         , React.createElement(ScreenHeader, { title: cust.name, subtitle: "Customer Profile" , onBack: () => setSelected(null),
@@ -818,7 +916,11 @@ function CustomerBook({ customers, sales, onClose, onSave, onDelete, requireAuth
             )
             , React.createElement('div', { style: { background: "var(--c-diamond-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 10, padding: "12px 14px" },}
               , React.createElement('div', { style: { fontSize: 9, color: "var(--c-blue-text2)", letterSpacing: 2, fontWeight: 700 },}, "PURCHASES")
-              , React.createElement('div', { style: { fontSize: 18, color: "var(--c-blue-text)", fontWeight: 800 },}, custSales.filter(s => s.type === "sale").length)
+              , React.createElement('div', { style: { fontSize: 18, color: "var(--c-blue-text)", fontWeight: 800 },}, saleSalesOnly.length)
+            )
+            , lastPurchaseDate && React.createElement('div', { style: { background: "var(--c-bg-panel)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "12px 14px", gridColumn: "span 2" },}
+              , React.createElement('div', { style: { fontSize: 9, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700 },}, "LAST PURCHASE")
+              , React.createElement('div', { style: { fontSize: 15, color: "var(--c-text-h)", fontWeight: 800 },}, lastPurchaseDate)
             )
           )
           , custSales.length > 0 && (
@@ -852,13 +954,17 @@ function CustomerBook({ customers, sales, onClose, onSave, onDelete, requireAuth
       , React.createElement('div', { style: { flex: 1, overflowY: "auto", padding: 12 },}
         , filtered.length === 0 && React.createElement('div', { style: { textAlign: "center", color: "var(--c-border2)", padding: 40, fontSize: 13 },}, "No customers yet"  )
         , filtered.map(cust => {
-          const spent = sales.filter(s => (s.customerId === cust.id || s.customerName === cust.name) && s.type === "sale").reduce((a,s) => a+(parseFloat(s.finalPrice)||0), 0);
+          const custSalesList = sales.filter(s => (s.customerId === cust.id || s.customerName === cust.name) && s.type === "sale");
+          const spent = custSalesList.reduce((a,s) => a+(parseFloat(s.finalPrice)||0), 0);
+          const lastCustSale = [...custSalesList].sort((a,b) => (b.createdAt||b.dateSold||"").localeCompare(a.createdAt||a.dateSold||""))[0];
+          const lastDate = lastCustSale ? fmtDate(lastCustSale.createdAt || lastCustSale.dateSold) : null;
           return (
             React.createElement('div', { key: cust.id, onClick: () => setSelected(cust.id),
               style: { background: "var(--c-bg-panel)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "12px 14px", marginBottom: 8, cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" },}
               , React.createElement('div', null
                 , React.createElement('div', { style: { fontSize: 14, color: "var(--c-text-h)", fontWeight: 700 },}, cust.name)
                 , React.createElement('div', { style: { fontSize: 11, color: "var(--c-text-sub)", marginTop: 2 },}, cust.phone || "No phone", cust.preferredKarat ? ` · ${cust.preferredKarat}` : "")
+                , lastDate && React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-dim)", marginTop: 1 },}, "Last purchase: " + lastDate)
               )
               , React.createElement('div', { style: { textAlign: "right" },}
                 , spent > 0 && React.createElement('div', { style: { fontSize: 13, color: "var(--c-tx-text)", fontWeight: 700 },}, fmtMoney(spent))
@@ -1198,6 +1304,30 @@ function Reports({ sales, purchases, repairs, onClose, onExportSales, onExportPu
   const totalGoldVal = periodSales.reduce((a,s) => a+(parseFloat(s.goldValue)||0), 0);
   const totalGoldWt = periodSales.reduce((a,s) => a+(parseFloat(s.goldWeight)||0), 0);
 
+  const saleSales = periodSales.filter(s => s.type === "sale");
+  const avgMarginPct = saleSales.length > 0
+    ? saleSales.reduce((a, s) => {
+        const sp = parseFloat(s.stockPrice) || 0;
+        return a + (sp > 0 ? ((parseFloat(s.finalPrice)||0) - sp) / sp * 100 : 0);
+      }, 0) / saleSales.length
+    : 0;
+  const byKind = saleSales.reduce((acc, s) => {
+    const k = s.itemKind || "other";
+    if (!acc[k]) acc[k] = { count: 0, value: 0 };
+    acc[k].count++;
+    acc[k].value += parseFloat(s.finalPrice) || 0;
+    return acc;
+  }, {});
+  const matBreakdown = saleSales.reduce((acc, s) => {
+    (s.components || []).forEach(c => {
+      const cat = c.category || "other";
+      acc[cat] = (acc[cat] || 0) + (parseFloat(c.price) || 0);
+    });
+    return acc;
+  }, {});
+  const totalOldGoldWt  = periodSales.reduce((a, s) => a + (parseFloat(s.oldJewelleryWeight)||0), 0);
+  const totalOldGoldVal = periodSales.reduce((a, s) => a + (parseFloat(s.oldJewelleryValue)||0), 0);
+
   const card = (label, value, color, bg, dimColor) => (
     React.createElement('div', { style: { background: bg, border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "12px 14px" },}
       , React.createElement('div', { style: { fontSize: 9, color: dimColor || "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 },}, label)
@@ -1245,6 +1375,38 @@ function Reports({ sales, purchases, repairs, onClose, onExportSales, onExportPu
           , card("Bank / UPI", fmtMoney(totalBank), "var(--c-blue-text)", "var(--c-diamond-bg)", "var(--c-blue-text2)")
           , card("Gold Received", fmtMoney(totalGoldVal), "#b07030", "var(--c-bracelet-bg)", "#8a5020")
           , card("Gold Weight", totalGoldWt.toFixed(2) + " g", "#b07030", "var(--c-bracelet-bg)", "#8a5020")
+        )
+        /* By Piece Type */
+        , Object.keys(byKind).length > 0 && React.createElement(React.Fragment, null
+          , React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" } }, "By Piece Type")
+          , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 } }
+            , Object.entries(byKind).map(([kind, d]) => {
+                const b = (kindBadge && kindBadge[kind]) || { color: "var(--c-text-h)", bg: "var(--c-bg-panel)", border: "var(--c-border)" };
+                return card(kind.charAt(0).toUpperCase()+kind.slice(1)+"s · "+d.count+" pcs", fmtMoney(d.value), b.color, b.bg, b.border);
+              })
+          )
+          , React.createElement('div', { style: { background: avgMarginPct >= 0 ? "var(--c-tx-bg)" : "var(--c-danger-bg)", border: "1px solid var(--c-border-dim)", borderRadius: 10, padding: "12px 14px", marginBottom: 14 } }
+            , React.createElement('div', { style: { fontSize: 9, color: avgMarginPct >= 0 ? "var(--c-tx-text2)" : "var(--c-danger-text)", letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", marginBottom: 4 } }, "Avg Markup on Cost per Sale")
+            , React.createElement('div', { style: { fontSize: 18, color: avgMarginPct >= 0 ? "var(--c-tx-text)" : "var(--c-danger-text)", fontWeight: 800 } }, (avgMarginPct >= 0 ? "+" : "") + avgMarginPct.toFixed(1) + "%")
+          )
+        )
+        /* Old Gold Exchange */
+        , totalOldGoldWt > 0 && React.createElement(React.Fragment, null
+          , React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" } }, "Old Gold Exchange")
+          , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }
+            , card("Weight Received", totalOldGoldWt.toFixed(2) + " g", "#b07030", "var(--c-bracelet-bg)", "#8a5020")
+            , card("Exchange Value", fmtMoney(totalOldGoldVal), "#b07030", "var(--c-bracelet-bg)", "#8a5020")
+          )
+        )
+        /* Materials in Sales */
+        , Object.values(matBreakdown).some(v => v > 500) && React.createElement(React.Fragment, null
+          , React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" } }, "Materials in Sales")
+          , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 14 } }
+            , Object.entries(matBreakdown).filter(([,v]) => v > 500).sort(([,a],[,b]) => b-a).map(([cat, val]) => {
+                const C = { gold:["var(--c-amb-text)","var(--c-gold-bg)","var(--c-amb-text2)"], polki:["var(--c-amb-text)","var(--c-polki-bg)","var(--c-amb-text2)"], diamond:["var(--c-blue-text)","var(--c-diamond-bg)","var(--c-blue-text2)"], stone:["var(--c-tx-text)","var(--c-stone-bg)","var(--c-tx-text2)"], labour:["var(--c-text-sub)","var(--c-labour-bg)","var(--c-text-dim)"] }[cat] || ["var(--c-text-dim)","var(--c-bg-panel)","var(--c-text-dim)"];
+                return card(cat.charAt(0).toUpperCase()+cat.slice(1), fmtMoney(val), C[0], C[1], C[2]);
+              })
+          )
         )
         /* Purchases */
         , React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" },}, "Purchases")
@@ -1505,6 +1667,92 @@ function PhotoUploader({ currentSrc, onUpload, onRemove }) {
   );
 }
 
+// ── Photo Strip — horizontal scroll, tap to enlarge ───────────
+function PhotoStrip({ item, allPhotos }) {
+  const [lightbox, setLightbox] = useState(null);
+  const itemPhotos = getItemPhotos(allPhotos, item);
+  if (itemPhotos.length === 0) return null;
+  const single = itemPhotos.length === 1;
+  return (
+    React.createElement('div', { style: { marginBottom: 12 } }
+      , lightbox !== null && React.createElement('div', {
+          onClick: () => setLightbox(null),
+          style: { position: "fixed", inset: 0, background: "#000000ee", zIndex: 3000, display: "flex", alignItems: "center", justifyContent: "center" },}
+          , React.createElement('img', { src: itemPhotos[lightbox].url, onClick: e => e.stopPropagation(), style: { maxWidth: "95vw", maxHeight: "88vh", objectFit: "contain", borderRadius: 8 },} )
+          , React.createElement('button', { onClick: () => setLightbox(null), style: { position: "absolute", top: 16, right: 16, background: "#1a0808cc", border: "1px solid #c06060", borderRadius: 8, color: "#cc2020", padding: "6px 14px", fontSize: 16, cursor: "pointer" },}, "✕")
+          , itemPhotos.length > 1 && React.createElement('div', { style: { position: "absolute", bottom: 20, display: "flex", gap: 8 },}
+            , itemPhotos.map((_, i) => React.createElement('div', { key: i, onClick: e => { e.stopPropagation(); setLightbox(i); }, style: { width: 8, height: 8, borderRadius: "50%", background: lightbox === i ? "#fff" : "#ffffff55", cursor: "pointer" },}))
+          )
+        )
+      , React.createElement('div', { style: { display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none" },}
+        , itemPhotos.map(({ url, slot }, idx) =>
+            React.createElement('div', { key: slot, onClick: () => setLightbox(idx), style: { flexShrink: 0, width: single ? "100%" : 160, height: single ? 240 : 160, borderRadius: 10, overflow: "hidden", border: "1px solid var(--c-border)", cursor: "pointer" },}
+              , React.createElement('img', { src: url, alt: "", style: { width: "100%", height: "100%", objectFit: "cover", display: "block" },} )
+            )
+          )
+        )
+      , !single && React.createElement('div', { style: { fontSize: 10, color: "var(--c-text-dim)", textAlign: "center", marginTop: 5 },}, itemPhotos.length, " photos · tap to enlarge")
+    )
+  );
+}
+
+// ── Multi Photo Uploader — up to 3 slots ─────────────────────
+function MultiPhotoUploader({ item, allPhotos, onSavePhoto }) {
+  const [cropSrc, setCropSrc] = useState(null);
+  const [cropSlot, setCropSlot] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [errMsg, setErrMsg] = useState("");
+
+  const MAX = 3;
+  const filledPhotos = getItemPhotos(allPhotos, item);
+  const slots = Array.from({ length: MAX }, (_, i) => {
+    const found = filledPhotos.find(p => p.slot === i);
+    return { slot: i, url: found ? found.url : null };
+  });
+
+  function handleFileSelected(slot, e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    e.target.value = "";
+    setCropSlot(slot);
+    setCropSrc(URL.createObjectURL(f));
+  }
+
+  async function handleCropped(croppedFile) {
+    const slot = cropSlot;
+    setCropSrc(null); setCropSlot(null);
+    setUploading(true); setErrMsg("");
+    try {
+      const url = await uploadToCloudinary(croppedFile);
+      await onSavePhoto(item, url, slot);
+    } catch(e) { setErrMsg(e.message); }
+    setUploading(false);
+  }
+
+  const thumb = { width: 86, height: 86, borderRadius: 8, overflow: "hidden", flexShrink: 0, position: "relative" };
+
+  return (
+    React.createElement('div', { style: { marginBottom: 12 } }
+      , cropSrc && React.createElement(CropModal, { src: cropSrc, onConfirm: handleCropped, onCancel: () => { URL.revokeObjectURL(cropSrc); setCropSrc(null); setCropSlot(null); },})
+      , errMsg && React.createElement('div', { style: { background: "var(--c-danger-bg)", border: "1px solid var(--c-danger-brd)", borderRadius: 8, padding: "7px 10px", marginBottom: 8, fontSize: 11, color: "var(--c-danger-text)" },}, "⚠ ", errMsg)
+      , React.createElement('div', { style: { display: "flex", gap: 8, marginBottom: 6 },}
+        , slots.map(({ slot, url }) => url
+            ? React.createElement('div', { key: slot, style: thumb }
+                , React.createElement('img', { src: url, style: { width: "100%", height: "100%", objectFit: "cover" },} )
+                , React.createElement('button', { onClick: () => onSavePhoto(item, null, slot), style: { position: "absolute", top: 3, right: 3, background: "#1a0808cc", border: "1px solid #c06060", borderRadius: 4, color: "#cc2020", padding: "1px 5px", fontSize: 10, cursor: "pointer" },}, "✕")
+              )
+            : React.createElement('label', { key: slot, style: { ...thumb, background: "var(--c-bg-input)", border: "1px dashed #3a2a4a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", cursor: uploading ? "default" : "pointer", gap: 4 },}
+                , React.createElement('span', { style: { fontSize: 22, opacity: 0.25 },}, "+")
+                , React.createElement('span', { style: { fontSize: 9, color: "var(--c-text-dim)" },}, "Photo ", slot + 1)
+                , !uploading && React.createElement('input', { type: "file", accept: "image/*", onChange: e => handleFileSelected(slot, e), style: { display: "none" },})
+              )
+          )
+        )
+      , uploading && React.createElement('div', { style: { fontSize: 11, color: "var(--c-text-dim)", padding: "4px 0" },}, "⏳ Uploading…")
+      , React.createElement('div', { style: { fontSize: 10, color: "#3a2a5a", textAlign: "center" },}, "Up to 3 photos · tap + to add · crops before uploading")
+    )
+  );
+}
 
 // ── Editable field helper ──────────────────────────────────────
 function EField({ value, onChange, type = "text", style = {} }) {
@@ -1523,7 +1771,7 @@ function EField({ value, onChange, type = "text", style = {} }) {
 }
 
 // ── Item Detail Screen ─────────────────────────────────────────
-function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePhoto, onSell, requireAuth, rateSilver, onSendToMemo, onCosting, hasCosting }) {
+function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePhoto, onSell, requireAuth, rateSilver, onSendToMemo, onCosting, hasCosting, onStatusChange }) {
   const [editMode, setEditMode] = useState(false);
   const [draft, setDraft] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1637,10 +1885,20 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
         ) : (
           React.createElement('div', { style: { display: "flex", gap: 6 },}
             , React.createElement('button', { onClick: () => requireAuth(startEdit), style: { ...btnBase, background: "var(--c-edit-bg)", color: "var(--c-edit-text)", border: "1px solid var(--c-edit-brd)", flex: 1, justifyContent: "center" },}, "✎ Edit" )
+            , React.createElement('button', { onClick: () => requireAuth(() => onStatusChange && onStatusChange(item)), style: { ...btnBase, background: (item.status && item.status !== "in_stock") ? STATUS_CONFIG[item.status].bg : "var(--c-bg-btn)", color: (item.status && item.status !== "in_stock") ? STATUS_CONFIG[item.status].color : "var(--c-text-dim)", border: "1px solid " + ((item.status && item.status !== "in_stock") ? STATUS_CONFIG[item.status].border : "var(--c-border2)"), padding: "8px 12px" },}, "📍" )
             , React.createElement('button', { onClick: () => requireAuth(() => setConfirmDelete(true)), style: { ...btnBase, background: "var(--c-danger-bg)", color: "var(--c-danger-text)", border: "1px solid var(--c-danger-brd)", padding: "8px 14px" },}, "🗑 Delete" )
             , React.createElement('button', { onClick: () => requireAuth(() => onSell(item)), style: { ...btnBase, background: "var(--c-tx-bg)", color: "var(--c-tx-text)", border: "1px solid var(--c-tx-border)", padding: "8px 14px" },}, "💰 Sell" )
             , onSendToMemo && React.createElement('button', { onClick: () => requireAuth(() => onSendToMemo(item)), style: { ...btnBase, background: "var(--c-blue-bg)", color: "var(--c-blue-text)", border: "1px solid var(--c-blue-brd)", padding: "8px 14px" },}, "📋 Memo" )
             , onCosting && React.createElement('button', { onClick: () => requireAuth(() => onCosting(item)), style: { ...btnBase, background: "var(--c-bg-panel)", color: hasCosting ? "var(--c-tx-text)" : "var(--c-text-dim)", border: hasCosting ? "1px solid var(--c-tx-border)" : "1px solid var(--c-border2)", padding: "8px 14px" },}, hasCosting ? "📦 Cost ✓" : "📦 Cost" )
+            , React.createElement('button', { onClick: () => {
+                const msg = [
+                  "*" + item.name + "*",
+                  fmt(liveTotal) + " at today’s rate",
+                  currentPhoto ? "\n" + currentPhoto : "",
+                  "\nAnjali Design Studio\nPanchwati, Udaipur",
+                ].filter(Boolean).join("\n");
+                window.open("https://wa.me/?text=" + encodeURIComponent(msg), "_blank");
+              }, style: { ...btnBase, background: "#0d2a0d", border: "1px solid #2a5a2a", color: "#48c048", padding: "8px 12px" },}, "📤" )
           )
         )
       )
@@ -1659,15 +1917,25 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
       , React.createElement('div', { style: { flex: 1, overflowY: "auto", padding: "16px" },}
 
         /* Photo */
-        , editMode ? (
-          React.createElement(PhotoUploader, {
-            currentSrc: currentPhoto,
-            onUpload: async url => { await onSavePhoto(item, url); },
-            onRemove: () => onSavePhoto(item, null),}
-          )
-        ) : currentPhoto ? (
-          React.createElement(PhotoBlock, { src: currentPhoto, name: item.name,} )
-        ) : null
+        , editMode
+          ? React.createElement(MultiPhotoUploader, { item: item, allPhotos: photos, onSavePhoto: onSavePhoto,})
+          : React.createElement(PhotoStrip, { item: item, allPhotos: photos,})
+
+        /* Status strip (view mode only) */
+        , !editMode && (item.status && item.status !== "in_stock") && (function() {
+            const st = item.status || "in_stock";
+            const cfg = STATUS_CONFIG[st] || STATUS_CONFIG.in_stock;
+            const si = item.statusInfo || {};
+            return React.createElement('div', { style: { background: cfg.bg, border: "1px solid " + cfg.border, borderRadius: 10, padding: "12px 16px", marginBottom: 16 } }
+              , React.createElement('div', { style: { fontSize: 10, color: cfg.color, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", marginBottom: 6, opacity: 0.75 } }, "Location")
+              , React.createElement('div', { style: { fontSize: 14, color: cfg.color, fontWeight: 800, marginBottom: si.sentTo || si.date || si.challanNo ? 8 : 0 } }, cfg.label)
+              , (si.sentTo || si.date || si.challanNo) && React.createElement('div', { style: { display: "flex", flexWrap: "wrap", gap: "4px 16px" } }
+                , si.sentTo    && React.createElement('span', { style: { fontSize: 12, color: cfg.color, opacity: 0.8 } }, "With: " + si.sentTo)
+                , si.date      && React.createElement('span', { style: { fontSize: 12, color: cfg.color, opacity: 0.8 } }, "Since: " + si.date)
+                , si.challanNo && React.createElement('span', { style: { fontSize: 12, color: cfg.color, opacity: 0.8 } }, "Challan: #" + si.challanNo)
+              )
+            );
+          })()
 
         /* Meta */
         , React.createElement('div', { style: { background: "var(--c-bg-header)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "14px 16px", marginBottom: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 },}
@@ -1698,7 +1966,7 @@ function ItemDetail({ item, goldRate, onBack, onSave, onDelete, photos, onSavePh
                   , c.category === "gold" && React.createElement('div', { style: { display: "flex", gap: 4, marginBottom: 8 },}
                     , ["14K","18K","22K","24K"].map(k => {
                       const mul = { "14K": 0.59, "18K": 0.76, "22K": 0.92, "24K": 1 }[k];
-                      const kRate = parseFloat((goldRate * mul).toFixed(1));
+                      const kRate = parseFloat((BASE_24K * mul).toFixed(1));
                       const active = Math.abs((c.rate != null ? parseFloat(c.rate) : 0) - kRate) < 2;
                       return React.createElement('button', { key: k, onClick: () => setCompField(idx, "rate", kRate),
                         style: { background: active ? "#2a1a08" : "var(--c-bg-btn)", border: `1px solid ${active ? "var(--c-amb-border)" : "var(--c-border2)"}`, borderRadius: 5, color: active ? "var(--c-amb-text)" : "var(--c-text-dim)", fontSize: 9, fontWeight: 700, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", letterSpacing: 1 },
@@ -2136,7 +2404,7 @@ function AddItem({ onSave, onCancel, existingItems, goldRate }) {
   const [form, setForm] = useState(() => ({
     id: "", kind: "ring", name: "", gross_weight: "", tags: "",
     components: [
-      { name: "14K Gold", category: "gold", weight: "", rate: parseFloat((goldRate * 0.59).toFixed(1)), price: 0, _priceOverride: false },
+      { name: "14K Gold", category: "gold", weight: "", rate: parseFloat((BASE_24K * 0.59).toFixed(1)), price: 0, _priceOverride: false },
       { name: "Diamond", category: "diamond", weight: "", rate: "", price: 0, _priceOverride: false },
       { name: "Labour", category: "labour", weight: "", rate: 1500, price: 0, _priceOverride: false },
     ]
@@ -2300,7 +2568,7 @@ function AddItem({ onSave, onCancel, existingItems, goldRate }) {
               , c.category === "gold" && React.createElement('div', { style: { display: "flex", gap: 4, marginBottom: 8 },}
                 , ["14K","18K","22K","24K"].map(k => {
                   const mul = { "14K": 0.59, "18K": 0.76, "22K": 0.916, "24K": 1 }[k];
-                  const kRate = parseFloat((goldRate * mul).toFixed(1));
+                  const kRate = parseFloat((BASE_24K * mul).toFixed(1));
                   const active = Math.abs(parseFloat(c.rate) - kRate) < 2;
                   return React.createElement('button', { key: k, onClick: () => setComp(idx, "rate", kRate),
                     style: { background: active ? "var(--c-amb-bg)" : "var(--c-bg)", border: `1px solid var(--c-amb-border)`, borderRadius: 5, color: active ? "var(--c-amb-text)" : "var(--c-amb-text2)", fontSize: 9, fontWeight: 700, padding: "3px 8px", cursor: "pointer", fontFamily: "inherit", letterSpacing: 1 },
@@ -2511,6 +2779,77 @@ function CostingView({ item, costing: initCosting, onClose, onSave }) {
   );
 }
 
+// ── Printable Catalog ─────────────────────────────────────────
+function CatalogView({ items, photos, goldRate, onClose }) {
+  const portalRef = React.useRef(null);
+  if (!portalRef.current) {
+    portalRef.current = document.createElement('div');
+    portalRef.current.id = 'cat-root';
+  }
+
+  useEffect(() => {
+    document.body.appendChild(portalRef.current);
+    const s = document.createElement('style');
+    s.id = 'cat-ps';
+    s.textContent = `@media print {
+      body > *:not(#cat-root) { display: none !important; }
+      #cat-root, #cat-root * { position: static !important; overflow: visible !important; height: auto !important; max-height: none !important; }
+      #cat-root { display: block !important; }
+      #cat-root .cat-toolbar { display: none !important; }
+      .cat-item { break-inside: avoid; }
+    }`;
+    document.head.appendChild(s);
+    return () => {
+      if (portalRef.current.parentNode) document.body.removeChild(portalRef.current);
+      const s2 = document.getElementById('cat-ps'); if (s2) s2.remove();
+    };
+  }, []);
+
+  function detectKarat(item) {
+    const g = (item.components || []).filter(c => c.category === "gold")[0];
+    if (!g || !g.rate) return "";
+    const r = g.rate / BASE_24K;
+    if (r > 0.9) return "22K"; if (r > 0.73) return "18K"; if (r > 0.55) return "14K"; if (r > 0.35) return "9K";
+    return "";
+  }
+
+  const printItems = items.filter(i => !i.memo && (!i.status || i.status === "in_stock"));
+
+  const content = React.createElement('div', { style: { position: "fixed", inset: 0, background: "#fff", zIndex: 5000, display: "flex", flexDirection: "column", fontFamily: "Jost, sans-serif" } }
+    , React.createElement('div', { className: "cat-toolbar", style: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "12px 20px", borderBottom: "1px solid #e0d4b8", background: "#faf8f2", flexShrink: 0 } }
+      , React.createElement('div', null
+        , React.createElement('div', { style: { fontSize: 18, fontWeight: 800, color: "#2a1a00" } }, "✦ Anjali Design Studio")
+        , React.createElement('div', { style: { fontSize: 11, color: "#8a7050" } }, printItems.length + " pieces · Panchwati, Udaipur")
+      )
+      , React.createElement('div', { style: { display: "flex", gap: 8 } }
+        , React.createElement('button', { onClick: () => window.print(), style: { background: "#1a3a1a", border: "none", borderRadius: 8, color: "#4ac04a", padding: "8px 18px", fontSize: 13, fontWeight: 700, cursor: "pointer" } }, "🖨 Print")
+        , React.createElement('button', { onClick: onClose, style: { background: "#f0ebe0", border: "1px solid #d0c0a0", borderRadius: 8, color: "#5a4030", padding: "8px 14px", fontSize: 13, cursor: "pointer" } }, "✕ Close")
+      )
+    )
+    , React.createElement('div', { className: "cat-scroll", style: { flex: 1, overflowY: "auto", padding: 20 } }
+      , React.createElement('div', { style: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 14 } }
+        , printItems.map(item => {
+            const photo = photos[`${item.kind}__${item.id}`] || null;
+            const price = fmt(liveItemTotal(item, goldRate));
+            const karat = detectKarat(item);
+            return React.createElement('div', { key: item.kind + "-" + item.id, className: "cat-item", style: { border: "1px solid #e0d4b8", borderRadius: 8, overflow: "hidden", background: "#fff" } }
+              , photo
+                  ? React.createElement('img', { src: photo, alt: item.name, style: { width: "100%", aspectRatio: "1/1", objectFit: "cover", display: "block" } })
+                  : React.createElement('div', { style: { width: "100%", aspectRatio: "1/1", background: "#f5f0e8", display: "flex", alignItems: "center", justifyContent: "center", color: "#c8b080", fontSize: 32 } }, "✦")
+              , React.createElement('div', { style: { padding: "8px 10px 10px" } }
+                , React.createElement('div', { style: { fontSize: 9, color: "#9a8060", letterSpacing: 1, marginBottom: 3 } }, "#" + item.id + (karat ? " · " + karat : "") + (item.gross_weight ? " · " + item.gross_weight + "g" : ""))
+                , React.createElement('div', { style: { fontSize: 11, fontWeight: 700, color: "#1a1000", lineHeight: 1.35, marginBottom: 5 } }, item.name)
+                , React.createElement('div', { style: { fontSize: 14, fontWeight: 800, color: "#a07820" } }, price)
+              )
+            );
+          })
+      )
+    )
+  );
+
+  return ReactDOM.createPortal(content, portalRef.current);
+}
+
 function StockAnalyzer() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
@@ -2548,6 +2887,10 @@ function StockAnalyzer() {
   const [costingItem, setCostingItem] = useState(null);
   const [activeForm, setActiveForm] = useState(null); // "customer"|"repair"|"purchase"
   const [editRecord, setEditRecord] = useState(null); // fn to call after unlock
+  const [statusModalItem, setStatusModalItem] = useState(null);
+  const [returnAlerts, setReturnAlerts] = useState([]);
+  const [chipFilters, setChipFilters] = useState({ karats: [], materials: [], price: null });
+  const [showCatalog, setShowCatalog] = useState(false);
 
   const isSavingRef = React.useRef(false);
 
@@ -2901,8 +3244,9 @@ function StockAnalyzer() {
   }, []);
 
   // ── Save Cloudinary URL to Firebase /jewellery/photos ────────
-  async function handleSavePhoto(item, urlOrNull) {
-    const key = `${item.kind}__${item.id}`;
+  async function handleSavePhoto(item, urlOrNull, slotIndex = 0) {
+    const base = `${item.kind}__${item.id}`;
+    const key = slotIndex === 0 ? base : `${base}__${slotIndex}`;
     try {
       const next = { ...photos };
       if (urlOrNull) {
@@ -2965,6 +3309,51 @@ function StockAnalyzer() {
     setRateSilver(rate);
     try { await fbSet("rateSilver", rate); setLastSync(new Date()); } catch(e) {}
   }
+
+  // ── Item status change ───────────────────────────────────────
+  async function handleStatusChange(item, { status, statusInfo }) {
+    const updated = { ...item, status, statusInfo: statusInfo || null };
+    const next = items.map(i => (i.id === updated.id && i.kind === updated.kind) ? updated : i);
+    setItems(next);
+    if (selected && selected.id === item.id && selected.kind === item.kind) setSelected(updated);
+    setStatusModalItem(null);
+    isSavingRef.current = true;
+    try { await fbSet("items", next); setLastSync(new Date()); setFbError(null); } catch(e) { setFbError("Status save failed"); }
+    isSavingRef.current = false;
+  }
+
+  // ── Auto-return: watch challan records for RETURN type ───────
+  const alertedChallanKeysRef = React.useRef(new Set());
+  const FB_CHALLAN_RECORDS = "https://ads-automation-d9560-default-rtdb.asia-southeast1.firebasedatabase.app/challan-generator/records";
+  useEffect(() => {
+    async function checkReturnChallans() {
+      try {
+        const outItems = items.filter(i => i.status && i.status !== "in_stock" && i.statusInfo && i.statusInfo.sentTo);
+        if (outItems.length === 0) return;
+        const res = await fetch(`${FB_CHALLAN_RECORDS}.json`);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!data) return;
+        Object.values(data).filter(r => r.purpose === "RETURN").forEach(challan => {
+          const key = String(challan.voucherNum || challan.id || "");
+          if (!key || alertedChallanKeysRef.current.has(key)) return;
+          const recvName = (challan.recvName || "").toLowerCase().trim();
+          if (!recvName) return;
+          const matched = outItems.filter(i => {
+            const sentTo = (i.statusInfo.sentTo || "").toLowerCase().trim();
+            return sentTo && (sentTo.includes(recvName) || recvName.includes(sentTo));
+          });
+          if (matched.length > 0) {
+            alertedChallanKeysRef.current.add(key);
+            setReturnAlerts(prev => [...prev, { key, challanNo: challan.voucherNum, recvName: challan.recvName, matchedItems: matched }]);
+          }
+        });
+      } catch(e) {}
+    }
+    checkReturnChallans();
+    const id = setInterval(checkReturnChallans, 30000);
+    return () => clearInterval(id);
+  }, [items]);
 
   // Gate any action behind password
   function requireAuth(action) {
@@ -3193,9 +3582,33 @@ function StockAnalyzer() {
   }
 
   const KIND_ORDER = { ring: 0, earring: 1, bracelet: 2, necklace: 3 };
+  const STATUS_FILTERS = ["approval", "repair"];
+  const KARAT_MUL = { "14K": 0.585, "18K": 0.76, "22K": 0.92 };
   const filtered = items.filter(item => {
     if (item.memo) return false;
-    if (filter !== "all" && item.kind !== filter) return false;
+    if (STATUS_FILTERS.includes(filter)) {
+      if ((item.status || "in_stock") !== filter) return false;
+    } else {
+      if (filter !== "all" && item.kind !== filter) return false;
+    }
+    if (chipFilters.karats.length > 0) {
+      const has = chipFilters.karats.some(k => {
+        const target = KARAT_MUL[k];
+        return (item.components || []).some(c => c.category === "gold" && Math.abs((c.rate || 0) / BASE_24K - target) < 0.05);
+      });
+      if (!has) return false;
+    }
+    if (chipFilters.materials.length > 0) {
+      const has = chipFilters.materials.some(m => (item.components || []).some(c => c.category === m));
+      if (!has) return false;
+    }
+    if (chipFilters.price) {
+      const p = liveItemTotal(item, goldRate);
+      if (chipFilters.price === "under50"  && p >= 50000)              return false;
+      if (chipFilters.price === "50to100"  && (p < 50000  || p >= 100000)) return false;
+      if (chipFilters.price === "100to200" && (p < 100000 || p >= 200000)) return false;
+      if (chipFilters.price === "over200"  && p < 200000)              return false;
+    }
     if (!search) return true;
     const q = search.toLowerCase();
     return item.name.toLowerCase().includes(q) || (item.tags || []).some(t => t.toLowerCase().includes(q));
@@ -3282,6 +3695,12 @@ function StockAnalyzer() {
         onCancel: () => { setShowPwModal(false); setPendingAction(null); setPwError(false); },
         error: pwError,}
       )
+      , showCatalog && React.createElement(CatalogView, { items: items, photos: photos, goldRate: goldRate, onClose: () => setShowCatalog(false),})
+      , statusModalItem && React.createElement(StatusModal, {
+        item: statusModalItem,
+        onSave: data => handleStatusChange(statusModalItem, data),
+        onCancel: () => setStatusModalItem(null),}
+      )
       , showSellForm && React.createElement(SellForm, { item: sellItem, goldRate: goldRate,
         onCancel: () => { setShowSellForm(false); setSellItem(null); },
         onSave: async form => { try { await saveSale(form); setShowSellForm(false); setSellItem(null); setSelected(null); } catch(e) { setFbError("Sale save failed: " + e.message); } },}
@@ -3303,7 +3722,7 @@ function StockAnalyzer() {
       , showMemo && React.createElement(MemoView, { items: items, goldRate: goldRate, onClose: () => setShowMemo(false), onReturn: handleReturnFromMemo, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
       , showAdd && !showSales && !showSellForm && React.createElement(AddItem, { onSave: handleAdd, onCancel: () => setShowAdd(false), existingItems: items, goldRate: goldRate,} )
       , costingItem && React.createElement(CostingView, { item: costingItem, costing: costing[`${costingItem.kind}__${costingItem.id}`] || {}, onClose: () => setCostingItem(null), onSave: async d => { await saveItemCosting(`${costingItem.kind}__${costingItem.id}`, d); },} )
-      , selected && !showAdd && !showSales && !showSellForm && !costingItem && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, rateSilver: rateSilver, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); }, onSendToMemo: handleSendToMemo, onCosting: item => setCostingItem(item), hasCosting: !!costing[`${selected.kind}__${selected.id}`],} )
+      , selected && !showAdd && !showSales && !showSellForm && !costingItem && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, rateSilver: rateSilver, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); }, onSendToMemo: handleSendToMemo, onCosting: item => setCostingItem(item), hasCosting: !!costing[`${selected.kind}__${selected.id}`], onStatusChange: item => setStatusModalItem(item),} )
 
       , React.createElement('div', { style: { display: (selected || showAdd || showSales || showSellForm || showCustomers || showRepairs || showPurchases || showReports || showMemo || !!costingItem) ? "none" : "flex", minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", flexDirection: "column" },}
       /* Header */
@@ -3344,6 +3763,7 @@ function StockAnalyzer() {
         , React.createElement('button', { onClick: () => setShowPurchases(true), style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 6, color: "var(--c-blue-text)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📦 BUYS" )
         , React.createElement('button', { onClick: () => setShowReports(true), style: { background: "var(--c-bg-header)", border: "1px solid var(--c-border)", borderRadius: 6, color: "var(--c-text-dim)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📊 REPORTS" )
         , React.createElement('button', { onClick: () => setShowMemo(true), style: { background: "var(--c-blue-bg)", border: "1px solid var(--c-blue-brd)", borderRadius: 6, color: "var(--c-blue-text)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "📋 MEMO" )
+        , React.createElement('button', { onClick: () => setShowCatalog(true), style: { background: "var(--c-bg-panel)", border: "1px solid var(--c-border)", borderRadius: 6, color: "var(--c-text-dim)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "🖨 CATALOG" )
         , React.createElement('button', { onClick: exportInventory, style: { background: "var(--c-bg-panel)", border: "1px solid var(--c-border)", borderRadius: 6, color: "var(--c-text-dim)", padding: "5px 11px", fontSize: 11, cursor: "pointer", fontFamily: "inherit", fontWeight: 700, letterSpacing: 1, flexShrink: 0, whiteSpace: "nowrap" },}, "↓ CSV" )
         , React.createElement('div', { style: { flex: 1 },} )
 
@@ -3371,9 +3791,35 @@ function StockAnalyzer() {
 
       /* Gold Rate Bar */
       , React.createElement(GoldRateBar, { goldRate: goldRate, setGoldRate: handleGoldRate, rateSilver: rateSilver, onSilverRateChange: handleSilverRate,} )
+      /* Gold rate drift warning */
+      , (Math.abs(goldRate - BASE_24K) / BASE_24K > 0.05) && React.createElement('div', { style: { background: "var(--c-amb-bg)", borderBottom: "1px solid var(--c-amb-border)", padding: "8px 16px", display: "flex", alignItems: "center", gap: 10 } }
+        , React.createElement('span', { style: { fontSize: 13 } }, "⚠️")
+        , React.createElement('span', { style: { fontSize: 11, color: "var(--c-amb-text)", fontWeight: 600, flex: 1 } }, "Gold rate is " + (goldRate > BASE_24K ? "+" : "") + Math.round((goldRate - BASE_24K) / BASE_24K * 100) + "% from the baseline (₹" + BASE_24K.toLocaleString("en-IN") + "). Update the baseline before adding new items.")
+      )
 
       /* Dashboard */
       , React.createElement(Dashboard, { items: items.filter(i => !i.memo), goldRate: goldRate,} )
+
+      /* Return alerts */
+      , returnAlerts.map(alert =>
+        React.createElement('div', { key: alert.key, style: { background: "var(--c-tx-bg)", borderBottom: "1px solid var(--c-tx-border)", padding: "10px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexShrink: 0 } }
+          , React.createElement('div', { style: { flex: 1, minWidth: 0 } }
+            , React.createElement('div', { style: { fontSize: 9, color: "var(--c-tx-text2)", letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", marginBottom: 2 } }, "↩ Return Detected")
+            , React.createElement('div', { style: { fontSize: 12, color: "var(--c-tx-text)", fontWeight: 700 } }, alert.recvName + (alert.challanNo ? "  ·  Challan #" + alert.challanNo : ""))
+            , React.createElement('div', { style: { fontSize: 11, color: "var(--c-tx-text2)" } }, alert.matchedItems.map(i => i.name).join(", "))
+          )
+          , React.createElement('div', { style: { display: "flex", gap: 6, flexShrink: 0 } }
+            , React.createElement('button', {
+              onClick: () => { alert.matchedItems.forEach(i => handleStatusChange(i, { status: "in_stock", statusInfo: null })); setReturnAlerts(prev => prev.filter(a => a.key !== alert.key)); },
+              style: { background: "var(--c-tx-btn2)", border: "1px solid var(--c-tx-border)", borderRadius: 7, color: "var(--c-tx-text)", padding: "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap" }
+            }, "✓ Mark Returned")
+            , React.createElement('button', {
+              onClick: () => setReturnAlerts(prev => prev.filter(a => a.key !== alert.key)),
+              style: { background: "none", border: "none", color: "var(--c-tx-text2)", padding: "5px 8px", fontSize: 14, cursor: "pointer", fontFamily: "inherit" }
+            }, "✕")
+          )
+        )
+      )
 
       /* Filter + Search */
       , React.createElement('div', { style: { padding: "12px 16px 0", borderBottom: "1px solid var(--c-border-dim)" },}
@@ -3385,13 +3831,24 @@ function StockAnalyzer() {
               fontFamily: "inherit", cursor: "pointer", letterSpacing: 1, flexShrink: 0,
               background: filter === val ? (val === "earring" ? "var(--c-earring-bg)" : val === "ring" ? "var(--c-ring-bg)" : val === "bracelet" ? "var(--c-bracelet-bg)" : val === "necklace" ? "var(--c-necklace-bg)" : "var(--c-all-bg)") : "transparent",
               border: filter === val
-                ? `1px solid ${val === "earring" ? "#40a090" : val === "ring" ? "#9060c0" : val === "bracelet" ? "#c07030" : val === "necklace" ? "#6060cc" : "var(--c-border2)"}`
+                ? "1px solid " + (val === "earring" ? "#40a090" : val === "ring" ? "#9060c0" : val === "bracelet" ? "#c07030" : val === "necklace" ? "#6060cc" : "var(--c-border2)")
                 : "1px solid var(--c-border-dim)",
               color: filter === val
                 ? (val === "earring" ? "var(--c-kind-earring)" : val === "ring" ? "var(--c-kind-ring)" : val === "bracelet" ? "var(--c-kind-bracelet)" : val === "necklace" ? "var(--c-kind-necklace)" : "var(--c-text)")
                 : "var(--c-text-dim)",
             },}, label)
           ))
+          , [["approval", "On Approval", STATUS_CONFIG.approval], ["repair", "At Vendor", STATUS_CONFIG.repair]].map(([val, label, cfg]) => {
+            const count = items.filter(i => !i.memo && (i.status || "in_stock") === val).length;
+            if (count === 0 && filter !== val) return null;
+            return React.createElement('button', { key: val, onClick: () => setFilter(val), style: {
+              padding: "7px 14px", borderRadius: 20, fontSize: 12, fontWeight: 700,
+              fontFamily: "inherit", cursor: "pointer", letterSpacing: 1, flexShrink: 0,
+              background: filter === val ? cfg.bg : "transparent",
+              border: "1px solid " + (filter === val ? cfg.border : "var(--c-border-dim)"),
+              color: filter === val ? cfg.color : "var(--c-text-dim)",
+            },}, label + (count > 0 ? " (" + count + ")" : ""));
+          })
         )
         /* Search + view toggle row */
         , React.createElement('div', { style: { display: "flex", gap: 8, marginBottom: 10, alignItems: "center" },}
@@ -3401,6 +3858,15 @@ function StockAnalyzer() {
             style: { flexShrink: 0, background: viewMode === "list" ? "var(--c-bg-btn)" : "var(--c-bg-header)", border: `1px solid ${viewMode === "list" ? "var(--c-text-sub)" : "var(--c-border)"}`, borderRadius: 10, color: viewMode === "list" ? "var(--c-text-dim)" : "var(--c-text-sub)", padding: "10px 14px", fontSize: 17, cursor: "pointer", lineHeight: 1 },}
             , viewMode === "lookbook" ? "⊞" : "≡"
           )
+        )
+        /* Chip filters */
+        , React.createElement('div', { style: { display: "flex", gap: 6, padding: "0 16px 10px", overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", alignItems: "center" } }
+          , ["14K","18K","22K"].map(k => { const on = chipFilters.karats.includes(k); return React.createElement('button', { key: k, onClick: () => setChipFilters(f => ({ ...f, karats: on ? f.karats.filter(x => x !== k) : [...f.karats, k] })), style: { padding: "4px 12px", borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, background: on ? "var(--c-gold-bg)" : "transparent", border: "1px solid " + (on ? "var(--c-amb-border)" : "var(--c-border-dim)"), color: on ? "var(--c-amb-text)" : "var(--c-text-dim)" } }, k); })
+          , React.createElement('div', { style: { width: 1, height: 14, background: "var(--c-border-dim)", flexShrink: 0, margin: "0 2px" } })
+          , [["polki","Polki","var(--c-amb-text)","var(--c-gold-bg)","var(--c-amb-border)"],["diamond","Diamond","var(--c-blue-text)","var(--c-blue-bg)","var(--c-blue-brd)"],["stone","Stone","var(--c-tx-text)","var(--c-stone-bg)","var(--c-tx-border)"]].map(([val,lbl,color,bg,brd]) => { const on = chipFilters.materials.includes(val); return React.createElement('button', { key: val, onClick: () => setChipFilters(f => ({ ...f, materials: on ? f.materials.filter(x => x !== val) : [...f.materials, val] })), style: { padding: "4px 12px", borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, background: on ? bg : "transparent", border: "1px solid " + (on ? brd : "var(--c-border-dim)"), color: on ? color : "var(--c-text-dim)" } }, lbl); })
+          , React.createElement('div', { style: { width: 1, height: 14, background: "var(--c-border-dim)", flexShrink: 0, margin: "0 2px" } })
+          , [["under50","< ₹50K"],["50to100","₹50K–1L"],["100to200","₹1L–2L"],["over200","₹2L+"]].map(([val,lbl]) => { const on = chipFilters.price === val; return React.createElement('button', { key: val, onClick: () => setChipFilters(f => ({ ...f, price: on ? null : val })), style: { padding: "4px 12px", borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, background: on ? "#181028" : "transparent", border: "1px solid " + (on ? "#9060c0" : "var(--c-border-dim)"), color: on ? "var(--c-text-h)" : "var(--c-text-dim)" } }, lbl); })
+          , (chipFilters.karats.length > 0 || chipFilters.materials.length > 0 || chipFilters.price) && React.createElement('button', { onClick: () => setChipFilters({ karats: [], materials: [], price: null }), style: { padding: "4px 10px", borderRadius: 16, fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: "inherit", flexShrink: 0, background: "none", border: "1px solid var(--c-danger-brd)", color: "var(--c-danger-text)", marginLeft: 4 } }, "✕ Clear")
         )
       )
 
@@ -3424,9 +3890,10 @@ function StockAnalyzer() {
                   )
                 )
                 , React.createElement('div', { style: { flex: 1, minWidth: 0 },}
-                  , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 3 },}
+                  , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 7, marginBottom: 3, flexWrap: "wrap" },}
                     , React.createElement('span', { style: { fontSize: 9, color: "var(--c-text-sub)", letterSpacing: 2, fontWeight: 700 },}, "#", item.id)
                     , React.createElement('span', { style: { fontSize: 9, padding: "1px 6px", borderRadius: 8, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, fontWeight: 700, letterSpacing: 1 },}, badge.label)
+                    , React.createElement(StatusBadge, { status: item.status })
                   )
                   , React.createElement('div', { style: { fontSize: 15, color: "var(--c-text-h)", fontWeight: 700, lineHeight: 1.35, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },}, item.name)
                   , React.createElement('div', { style: { fontSize: 12, color: "var(--c-text-sub)", marginTop: 3, fontWeight: 600 },}
@@ -3466,9 +3933,10 @@ function StockAnalyzer() {
                   , React.createElement(LookbookThumb, { src: photos[`${item.kind}__${item.id}`] || null, name: item.name,} )
                   /* Info strip */
                   , React.createElement('div', { style: { padding: "10px 10px 12px" },}
-                    , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 4 },}
+                    , React.createElement('div', { style: { display: "flex", alignItems: "center", gap: 5, marginBottom: 4, flexWrap: "wrap" },}
                       , React.createElement('span', { style: { fontSize: 8, color: "var(--c-text-sub)", letterSpacing: 1, fontWeight: 700 },}, "#", item.id)
                       , React.createElement('span', { style: { fontSize: 8, padding: "1px 5px", borderRadius: 6, background: badge.bg, border: `1px solid ${badge.border}`, color: badge.color, fontWeight: 700 },}, badge.label)
+                      , React.createElement(StatusBadge, { status: item.status })
                     )
                     , React.createElement('div', { style: { fontSize: 12, color: "var(--c-text-h)", fontWeight: 700, lineHeight: 1.3, overflow: "hidden", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical" },}, item.name)
                     , React.createElement('div', { style: { fontSize: 13, color: rateChanged ? "var(--c-amb-text)" : "var(--c-kind-ring)", fontWeight: 800, marginTop: 6, fontVariantNumeric: "tabular-nums" },}, fmt(liveTotal))
