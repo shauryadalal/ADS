@@ -2118,9 +2118,9 @@ function Dashboard({ items, goldRate }) {
 
   // ── Compute all metrics live ──────────────────────────────────
   const metrics = (() => {
-    let sellTotal = 0, gold14 = 0, gold18 = 0, gold24 = 0;
+    let sellTotal = 0, gold9 = 0, gold14 = 0, gold18 = 0, gold22 = 0, gold24 = 0;
     let polki = 0, diamond = 0, stone = 0, labour = 0, other = 0;
-    let gold14g = 0, gold18g = 0, gold24g = 0;
+    let gold9g = 0, gold14g = 0, gold18g = 0, gold22g = 0, gold24g = 0;
     const byKind = { ring: 0, earring: 0, bracelet: 0, necklace: 0 };
 
     items.forEach(item => {
@@ -2131,12 +2131,13 @@ function Dashboard({ items, goldRate }) {
       item.components.forEach(c => {
         const p = livePrice(c, goldRate);
         if (c.category === "gold") {
-          // Detect karat by rate proximity
-          const r = c.rate || 0;
-          const ratio = r / BASE_24K;
-          if (ratio > 0.9) { gold24 += p; gold24g += (c.weight || 0); }
-          else if (ratio > 0.7) { gold18 += p; gold18g += (c.weight || 0); }
-          else { gold14 += p; gold14g += (c.weight || 0); }
+          // Detect karat by rate proximity to known multipliers (9K=0.385,14K=0.585,18K=0.76,22K=0.92,24K=1.0)
+          const ratio = (c.rate || 0) / BASE_24K;
+          if (ratio > 0.96)      { gold24 += p; gold24g += (c.weight || 0); }
+          else if (ratio > 0.88) { gold22 += p; gold22g += (c.weight || 0); }
+          else if (ratio > 0.7)  { gold18 += p; gold18g += (c.weight || 0); }
+          else if (ratio > 0.5)  { gold14 += p; gold14g += (c.weight || 0); }
+          else                   { gold9  += p; gold9g  += (c.weight || 0); }
         } else if (c.category === "polki")   polki    += p;
         else if (c.category === "diamond")   diamond  += p;
         else if (c.category === "stone")     stone    += p;
@@ -2145,15 +2146,15 @@ function Dashboard({ items, goldRate }) {
       });
     });
 
-    const totalGold = gold14 + gold18 + gold24;
+    const totalGold = gold9 + gold14 + gold18 + gold22 + gold24;
     const costPrice = sellTotal * 0.80;
     const margin    = sellTotal - costPrice;
-    const goldPct   = totalGold / sellTotal * 100;
-    const diamondPct= diamond   / sellTotal * 100;
-    const polkiPct  = polki     / sellTotal * 100;
+    const goldPct   = sellTotal > 0 ? (totalGold / sellTotal * 100) : 0;
+    const diamondPct= sellTotal > 0 ? (diamond   / sellTotal * 100) : 0;
+    const polkiPct  = sellTotal > 0 ? (polki     / sellTotal * 100) : 0;
 
-    return { sellTotal, costPrice, margin, totalGold, gold14, gold18, gold24,
-             gold14g, gold18g, gold24g, polki, diamond, stone, labour, other,
+    return { sellTotal, costPrice, margin, totalGold, gold9, gold14, gold18, gold22, gold24,
+             gold9g, gold14g, gold18g, gold22g, gold24g, polki, diamond, stone, labour, other,
              goldPct, diamondPct, polkiPct, byKind, itemCount: items.length };
   })();
 
@@ -2220,10 +2221,14 @@ function Dashboard({ items, goldRate }) {
             , React.createElement(Tile, { label: "18K Gold" , value: fmtCr(metrics.gold18),
               sub: `${metrics.gold18g.toFixed(1)} g`, color: "#b08018", bg: "#1c1606", border: "#503a10",} )
           )
-          , metrics.gold24 > 0 && (
-            React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 8 },}
-              , React.createElement(Tile, { label: "24K Gold" , value: fmtCr(metrics.gold24),
+          , (metrics.gold22 > 0 || metrics.gold24 > 0 || metrics.gold9 > 0) && (
+            React.createElement('div', { style: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 },}
+              , metrics.gold22 > 0 && React.createElement(Tile, { label: "22K Gold" , value: fmtCr(metrics.gold22),
+                sub: `${metrics.gold22g.toFixed(1)} g`, color: "#e8c060", bg: "#1e1604", border: "#584010",} )
+              , metrics.gold24 > 0 && React.createElement(Tile, { label: "24K Gold" , value: fmtCr(metrics.gold24),
                 sub: `${metrics.gold24g.toFixed(1)} g`, color: "#ffd060", bg: "#201808", border: "#604010",} )
+              , metrics.gold9 > 0 && React.createElement(Tile, { label: "9KT Gold" , value: fmtCr(metrics.gold9),
+                sub: `${metrics.gold9g.toFixed(1)} g`, color: "#a07828", bg: "#181000", border: "#503808",} )
             )
           )
           , React.createElement(Bar, { pct: metrics.goldPct, color: "#b08018",} )
@@ -2253,7 +2258,7 @@ function Dashboard({ items, goldRate }) {
               React.createElement('div', { key: label, style: { background: bg, border: `1px solid ${border}`, borderRadius: 10, padding: "10px 14px" },}
                 , React.createElement('div', { style: { fontSize: 9, color, letterSpacing: 2, fontWeight: 700, textTransform: "uppercase", marginBottom: 4, opacity: 0.7 },}, label)
                 , React.createElement('div', { style: { fontSize: 16, color, fontWeight: 800 },}, fmtCr(val || 0))
-                , React.createElement(Bar, { pct: (val || 0) / metrics.sellTotal * 100, color: color,} )
+                , React.createElement(Bar, { pct: metrics.sellTotal > 0 ? (val || 0) / metrics.sellTotal * 100 : 0, color: color,} )
               )
             ))
           )
@@ -2616,7 +2621,7 @@ function AddItem({ onSave, onCancel, existingItems, goldRate }) {
 }
 
 // ── Costing View ─────────────────────────────────────────────────
-function CostingView({ item, costing: initCosting, onClose, onSave }) {
+function CostingView({ item, costing: initCosting, onClose, onSave, goldRate }) {
   const blank = { itemNo: item ? `${item.kind}__${item.id}` : "", itemName: item?.name || "", invoiceNo: "", invoiceDate: "", partyName: "", vendorProfile: "", metal: "", grossWeight: 0, netWeight: 0, fgWeight: 0, goldRate: 0, goldAmt: 0, diamonds: [], makingRate: 0, makingAmt: 0, actualDiamondRate: 0, otherCharges: 0, otherChargesNote: "", vendorTotal: 0 };
   const [d, setD] = useState({ ...blank, ...initCosting });
   const [saving, setSaving] = useState(false);
@@ -2635,7 +2640,7 @@ function CostingView({ item, costing: initCosting, onClose, onSave }) {
   }, 0);
   const totalCost = (parseFloat(d.goldAmt)||0) + totalHandling + (parseFloat(d.makingAmt)||0) + actualDiaCost + (parseFloat(d.otherCharges)||0);
   const diff = totalCost - (parseFloat(d.vendorTotal)||0);
-  const stockPrice = parseFloat(item?.total) || 0;
+  const stockPrice = item ? liveItemTotal(item, goldRate || BASE_24K) : (parseFloat(item?.total) || 0);
   const profit = stockPrice - totalCost;
   const markupPct = totalCost > 0 ? (profit / totalCost) * 100 : 0;
   const marginPct = stockPrice > 0 ? (profit / stockPrice) * 100 : 0;
@@ -2809,7 +2814,7 @@ function CatalogView({ items, photos, goldRate, onClose }) {
     const g = (item.components || []).filter(c => c.category === "gold")[0];
     if (!g || !g.rate) return "";
     const r = g.rate / BASE_24K;
-    if (r > 0.9) return "22K"; if (r > 0.73) return "18K"; if (r > 0.55) return "14K"; if (r > 0.35) return "9K";
+    if (r > 0.96) return "24K"; if (r > 0.88) return "22K"; if (r > 0.7) return "18K"; if (r > 0.5) return "14K"; if (r > 0.35) return "9K";
     return "";
   }
 
@@ -2974,13 +2979,14 @@ function StockAnalyzer() {
     if (sale.itemId && sale.itemKind) {
       const key = `${sale.itemKind}::${sale.itemId}`;
       const next = items.filter(i => !(String(i.id) === String(sale.itemId) && i.kind === sale.itemKind));
-      setItems(next);
       isSavingRef.current = true;
-      await fbSet("items", next);
+      // deletedBaseIds written first — if the items write crashes, reconcile still drops this item on next load
       if (BASE_KEYS.has(key)) {
         const existing = await fbGet("deletedBaseIds") || [];
         await fbSet("deletedBaseIds", [...new Set([...existing, key])]);
       }
+      setItems(next);
+      await fbSet("items", next);
       isSavingRef.current = false;
     }
   }
@@ -3334,7 +3340,13 @@ function StockAnalyzer() {
         if (!res.ok) return;
         const data = await res.json();
         if (!data) return;
-        Object.values(data).filter(r => r.purpose === "RETURN").forEach(challan => {
+        const allRecords = Object.values(data);
+        const unknownVersion = allRecords.find(r => r._v !== undefined && r._v !== 1);
+        if (unknownVersion) {
+          setFbError(`Auto-return watcher: challan records use schema v${unknownVersion._v} (expected v1). Return detection paused — update ads-stock to match.`);
+          return;
+        }
+        allRecords.filter(r => r.purpose === "RETURN").forEach(challan => {
           const key = String(challan.voucherNum || challan.id || "");
           if (!key || alertedChallanKeysRef.current.has(key)) return;
           const recvName = (challan.recvName || "").toLowerCase().trim();
@@ -3721,7 +3733,7 @@ function StockAnalyzer() {
       , showReports && React.createElement(Reports, { sales: sales, purchases: purchases, repairs: repairs, onClose: () => setShowReports(false), onExportSales: exportSalesCSV, onExportPurchases: exportPurchasesCSV,} )
       , showMemo && React.createElement(MemoView, { items: items, goldRate: goldRate, onClose: () => setShowMemo(false), onReturn: handleReturnFromMemo, onSell: item => { setSellItem(item); setShowSellForm(true); },} )
       , showAdd && !showSales && !showSellForm && React.createElement(AddItem, { onSave: handleAdd, onCancel: () => setShowAdd(false), existingItems: items, goldRate: goldRate,} )
-      , costingItem && React.createElement(CostingView, { item: costingItem, costing: costing[`${costingItem.kind}__${costingItem.id}`] || {}, onClose: () => setCostingItem(null), onSave: async d => { await saveItemCosting(`${costingItem.kind}__${costingItem.id}`, d); },} )
+      , costingItem && React.createElement(CostingView, { item: costingItem, costing: costing[`${costingItem.kind}__${costingItem.id}`] || {}, onClose: () => setCostingItem(null), onSave: async d => { await saveItemCosting(`${costingItem.kind}__${costingItem.id}`, d); }, goldRate: goldRate,} )
       , selected && !showAdd && !showSales && !showSellForm && !costingItem && React.createElement(ItemDetail, { item: selected, goldRate: goldRate, rateSilver: rateSilver, onBack: () => setSelected(null), onSave: handleSave, onDelete: handleDelete, photos: photos, onSavePhoto: handleSavePhoto, requireAuth: requireAuth, onSell: item => { setSellItem(item); setShowSellForm(true); }, onSendToMemo: handleSendToMemo, onCosting: item => setCostingItem(item), hasCosting: !!costing[`${selected.kind}__${selected.id}`], onStatusChange: item => setStatusModalItem(item),} )
 
       , React.createElement('div', { style: { display: (selected || showAdd || showSales || showSellForm || showCustomers || showRepairs || showPurchases || showReports || showMemo || !!costingItem) ? "none" : "flex", minHeight: "100vh", background: "var(--c-bg)", color: "var(--c-text)", fontFamily: "'Palatino Linotype','Book Antiqua',Palatino,serif", flexDirection: "column" },}
